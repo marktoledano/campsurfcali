@@ -1,0 +1,124 @@
+@import "tailwindcss" source("../");
+
+/* SurfCampTrackerCali — sun-faded California state-park poster aesthetic:
+   warm cream paper, deep pine ink, Pacific teal, and a low-sun amber. */
+@theme {
+  --color-sand: #f3ecda;
+  --color-sand-deep: #e7dcc1;
+  --color-paper: #fbf7ec;
+  --color-pine: #1d2a24;
+  --color-pine-soft: #43524a;
+  --color-ocean: #0f6d68;
+  --color-ocean-deep: #0a4b47;
+  --color-sunset: #d5652f;
+  --color-sunset-soft: #e79a48;
+  --color-sage: #7f8d6c;
+  --color-clay: #b9482f;
+
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-body: "Archivo", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    color: var(--color-pine);
+    background-color: var(--color-sand);
+    /* layered sun + horizon atmosphere behind the paper */
+    background-image:
+      radial-gradient(
+        900px 520px at 82% -8%,
+        rgba(231, 154, 72, 0.35),
+        transparent 60%
+      ),
+      radial-gradient(
+        760px 460px at 6% 4%,
+        rgba(15, 109, 104, 0.14),
+        transparent 55%
+      );
+    background-attachment: fixed;
+  }
+}
+
+/* Fine paper grain, fixed so it never repaints while scrolling. */
+.grain::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+}
+
+/* Staggered entrance for cards / list items. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise {
+  animation: rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes sweep {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-sand-deep) 25%,
+    var(--color-paper) 50%,
+    var(--color-sand-deep) 75%
+  );
+  background-size: 200% 100%;
+  animation: sweep 1.4s ease-in-out infinite;
+}
+
+/* Slow pulse for the "live" indicator. */
+@keyframes beacon {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
+}
+.beacon {
+  animation: beacon 2s ease-in-out infinite;
+}
+
+/* Dashed "ticket stub" divider used on cards. */
+.stub-edge {
+  background-image: radial-gradient(
+    circle at 6px 50%,
+    transparent 5px,
+    currentColor 5px,
+    currentColor 6px,
+    transparent 6px
+  );
+  background-size: 16px 100%;
+}
