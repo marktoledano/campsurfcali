@@ -1,0 +1,6 @@
+node_modules/
+
+# Local Cloudflare folders/secrets
+.wrangler
+.dev.vars
+dist

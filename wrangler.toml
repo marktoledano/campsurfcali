@@ -1,0 +1,10 @@
+name = "campsurfcali"
+main = "src/server.ts"
+compatibility_date = "2026-07-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "dist/client"
+
+[triggers]
+crons = ["*/5 * * * *"]

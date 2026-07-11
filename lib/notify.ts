@@ -1,4 +1,5 @@
 import type { AvailableUnit, Watch } from "../db/schema.js";
+import { getCfEnv } from "../src/server/cf-env.js";
 
 /**
  * Notification delivery. In-app notifications are always recorded in the
@@ -8,11 +9,8 @@ import type { AvailableUnit, Watch } from "../db/schema.js";
  * zero required configuration or secrets committed to the repo.
  */
 
-function envGet(key: string): string | undefined {
-  // `Netlify.env` in function/edge contexts; `process.env` elsewhere.
-  const netlifyEnv = (globalThis as any).Netlify?.env;
-  if (netlifyEnv?.get) return netlifyEnv.get(key) ?? undefined;
-  return process.env[key];
+function envGet(key: "RESEND_API_KEY" | "ALERT_FROM_EMAIL"): string | undefined {
+  return getCfEnv()[key];
 }
 
 function formatDates(dates: string[]): string {

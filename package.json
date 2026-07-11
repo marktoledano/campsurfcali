@@ -1,5 +1,5 @@
 {
-  "name": "dashboard",
+  "name": "campsurfcali",
   "private": true,
   "type": "module",
   "scripts": {
@@ -7,8 +7,7 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@netlify/database": "^1.1.0",
-    "@netlify/functions": "^5.3.0",
+    "@neondatabase/serverless": "^1.1.0",
     "@tailwindcss/vite": "4.2.2",
     "@tanstack/react-router": "1.168.22",
     "@tanstack/react-start": "1.167.41",
@@ -25,7 +24,8 @@
     "vite-tsconfig-paths": "6.1.1"
   },
   "devDependencies": {
-    "@netlify/vite-plugin-tanstack-start": "1.3.16",
+    "@cloudflare/vite-plugin": "^1.44.0",
+    "@cloudflare/workers-types": "^5.20260711.1",
     "@tailwindcss/vite": "4.2.2",
     "@types/node": "22.19.19",
     "@types/react": "19.2.15",
@@ -36,6 +36,7 @@
     "rimraf": "6.1.3",
     "tailwindcss": "4.2.2",
     "typescript": "5.9.3",
-    "vite": "7.3.3"
+    "vite": "7.3.3",
+    "wrangler": "^4.110.0"
   }
 }
