@@ -66,7 +66,8 @@ export type NewWatchInput = {
   autoBook: boolean
 }
 
-async function json<T>(res: Response): Promise<T> {
+async function json<T>(resOrPromise: Response | Promise<Response>): Promise<T> {
+  const res = await resOrPromise
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     throw new Error((body as any).error || `Request failed (${res.status})`)
