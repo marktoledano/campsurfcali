@@ -9,15 +9,21 @@ import {
 } from "drizzle-orm/pg-core";
 
 /**
- * A single unit (campsite) that is currently open for the watched date range,
- * as stored on the watch row so the dashboard can render status without
- * re-polling ReserveCalifornia.
+ * A single unit (campsite) that is currently open for one of the watch's date
+ * ranges, as stored on the watch row so the dashboard can render status
+ * without re-polling ReserveCalifornia.
  */
 export type AvailableUnit = {
   unitId: number;
   unitName: string;
   /** ISO date strings (YYYY-MM-DD) that are free for this unit. */
   dates: string[];
+};
+
+/** One of a watch's (possibly several) desired stay windows. */
+export type DateRange = {
+  startDate: string;
+  endDate: string;
 };
 
 /**
@@ -33,9 +39,10 @@ export const watches = pgTable("watches", {
   facilityName: text("facility_name").notNull(),
   placeId: integer("place_id").notNull(),
   facilityId: integer("facility_id").notNull(),
-  // Desired stay window, stored as YYYY-MM-DD text.
-  startDate: text("start_date").notNull(),
-  endDate: text("end_date").notNull(),
+  // Desired stay windows. A watch can track several separate date ranges at
+  // the same campground (e.g. two different weekends); the poller checks
+  // each one independently and merges the results.
+  dateRanges: jsonb("date_ranges").$type<DateRange[]>().notNull(),
   // Minimum number of consecutive free nights that counts as a match.
   minNights: integer("min_nights").notNull().default(1),
   // Optional case-insensitive substring filter on the campsite/unit name.

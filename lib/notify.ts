@@ -52,12 +52,16 @@ export async function sendAlert({
     )
     .join("");
 
+  const windows = watch.dateRanges
+    .map((r) => `${r.startDate} → ${r.endDate}`)
+    .join(", ");
+
   const html = `
     <div style="font-family:system-ui,sans-serif;max-width:560px">
       <h2 style="margin:0 0 4px">🏄 A campsite opened up!</h2>
       <p style="color:#475569;margin:0 0 16px">
         ${watch.facilityName} at ${watch.parkName} has availability for your
-        ${watch.startDate} → ${watch.endDate} window.
+        ${windows} window${watch.dateRanges.length > 1 ? "s" : ""}.
       </p>
       <ul>${rows}</ul>
       <p style="margin:20px 0">

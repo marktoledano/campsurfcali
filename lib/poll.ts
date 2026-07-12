@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { watches, matches, type Watch } from "../db/schema.js";
+import { watches, matches, type Watch, type AvailableUnit } from "../db/schema.js";
 import { getGrid, bookingUrl } from "./reserve-california.js";
 import { matchUnits } from "./matcher.js";
 import { sendAlert } from "./notify.js";
@@ -13,14 +13,36 @@ export type PollSummary = {
 };
 
 /**
+ * Poll every one of a watch's date ranges and merge the results into a single
+ * per-unit availability list, unioning the free dates when the same unit
+ * shows up open in more than one range.
+ */
+async function pollDateRanges(watch: Watch): Promise<AvailableUnit[]> {
+  const byUnit = new Map<number, AvailableUnit>();
+  for (const [i, range] of watch.dateRanges.entries()) {
+    // ~1 request/second to ReserveCalifornia, including across a watch's own ranges.
+    if (i > 0) await new Promise((r) => setTimeout(r, 1100));
+    const grid = await getGrid(watch.facilityId, range.startDate, range.endDate);
+    for (const unit of matchUnits(grid.units, watch)) {
+      const existing = byUnit.get(unit.unitId);
+      if (existing) {
+        existing.dates = [...new Set([...existing.dates, ...unit.dates])].sort();
+      } else {
+        byUnit.set(unit.unitId, { ...unit, dates: [...unit.dates] });
+      }
+    }
+  }
+  return [...byUnit.values()];
+}
+
+/**
  * Poll a single watch against ReserveCalifornia, persist the current
  * availability, and record + notify any newly-opened sites.
  */
 export async function pollWatch(watch: Watch): Promise<PollSummary> {
   const url = bookingUrl(watch.placeId, watch.facilityId);
   try {
-    const grid = await getGrid(watch.facilityId, watch.startDate, watch.endDate);
-    const available = matchUnits(grid.units, watch);
+    const available = await pollDateRanges(watch);
 
     // Units that were not open on the previous poll are "newly open" and worth
     // an alert. Comparing against the stored snapshot prevents repeat spam.

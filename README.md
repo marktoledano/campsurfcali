@@ -11,8 +11,9 @@ the campgrounds and dates you care about and notifies you when something opens.
 ## What it does
 
 - **Search any park & campground** across the ReserveCalifornia system.
-- **Create "watches"** for a campground, a date window, minimum consecutive
-  nights, an optional site-name filter, and ADA-only if needed.
+- **Create "watches"** for a campground, one or more separate date windows,
+  minimum consecutive nights, an optional site-name filter, and ADA-only if
+  needed.
 - **Polls automatically every 5 minutes** via a Cloudflare Worker cron trigger,
   and on demand with a "check now" button.
 - **Alerts you** in an in-app feed and (optionally) by email, each alert carrying a

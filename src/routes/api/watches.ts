@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { desc, eq } from "drizzle-orm";
 import { db } from "../../../db/index.js";
-import { watches, type NewWatch } from "../../../db/schema.js";
+import { watches, type NewWatch, type DateRange } from "../../../db/schema.js";
 
 /**
  *   GET  /api/watches?email=...  -> that user's watches (newest first)
@@ -42,8 +42,10 @@ export const Route = createFileRoute("/api/watches")({
           facilityName: String(body.facilityName),
           placeId: Number(body.placeId),
           facilityId: Number(body.facilityId),
-          startDate: String(body.startDate),
-          endDate: String(body.endDate),
+          dateRanges: (body.dateRanges as any[]).map((r) => ({
+            startDate: String(r.startDate),
+            endDate: String(r.endDate),
+          })),
           minNights: Math.max(1, Number(body.minNights) || 1),
           siteFilter: body.siteFilter ? String(body.siteFilter).trim() : null,
           adaOnly: Boolean(body.adaOnly),
@@ -57,6 +59,8 @@ export const Route = createFileRoute("/api/watches")({
   },
 });
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
 function validate(body: any): string[] {
   const errors: string[] = [];
   if (!body?.email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(body.email)))
@@ -65,15 +69,18 @@ function validate(body: any): string[] {
     errors.push("facilityId is required");
   if (!body?.placeId || Number.isNaN(Number(body.placeId)))
     errors.push("placeId is required");
-  if (!body?.startDate || !/^\d{4}-\d{2}-\d{2}$/.test(String(body.startDate)))
-    errors.push("startDate must be YYYY-MM-DD");
-  if (!body?.endDate || !/^\d{4}-\d{2}-\d{2}$/.test(String(body.endDate)))
-    errors.push("endDate must be YYYY-MM-DD");
-  if (
-    body?.startDate &&
-    body?.endDate &&
-    String(body.endDate) <= String(body.startDate)
-  )
-    errors.push("endDate must be after startDate");
+
+  if (!Array.isArray(body?.dateRanges) || body.dateRanges.length === 0) {
+    errors.push("at least one date range is required");
+    return errors;
+  }
+  (body.dateRanges as DateRange[]).forEach((r, i) => {
+    if (!r?.startDate || !ISO_DATE.test(String(r.startDate)))
+      errors.push(`date range ${i + 1}: startDate must be YYYY-MM-DD`);
+    if (!r?.endDate || !ISO_DATE.test(String(r.endDate)))
+      errors.push(`date range ${i + 1}: endDate must be YYYY-MM-DD`);
+    if (r?.startDate && r?.endDate && String(r.endDate) <= String(r.startDate))
+      errors.push(`date range ${i + 1}: endDate must be after startDate`);
+  });
   return errors;
 }

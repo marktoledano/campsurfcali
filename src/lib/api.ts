@@ -6,6 +6,11 @@ export type AvailableUnit = {
   dates: string[]
 }
 
+export type DateRange = {
+  startDate: string
+  endDate: string
+}
+
 export type Watch = {
   id: number
   email: string
@@ -13,8 +18,7 @@ export type Watch = {
   facilityName: string
   placeId: number
   facilityId: number
-  startDate: string
-  endDate: string
+  dateRanges: DateRange[]
   minNights: number
   siteFilter: string | null
   adaOnly: boolean
@@ -58,8 +62,7 @@ export type NewWatchInput = {
   facilityName: string
   placeId: number
   facilityId: number
-  startDate: string
-  endDate: string
+  dateRanges: DateRange[]
   minNights: number
   siteFilter: string | null
   adaOnly: boolean

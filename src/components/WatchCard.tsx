@@ -137,9 +137,14 @@ export function WatchCard({ watch, onChange, onRemove }: Props) {
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-pine-soft">
-          <span className="flex items-center gap-1.5">
-            <Tent className="h-4 w-4 text-ocean" />
-            {formatDateRange(watch.startDate, watch.endDate)}
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Tent className="h-4 w-4 shrink-0 text-ocean" />
+            {watch.dateRanges.map((r, i) => (
+              <span key={i} className="flex items-center gap-2">
+                {i > 0 && <span className="text-pine/30">+</span>}
+                {formatDateRange(r.startDate, r.endDate)}
+              </span>
+            ))}
           </span>
           <span className="text-pine/30">•</span>
           <span>
