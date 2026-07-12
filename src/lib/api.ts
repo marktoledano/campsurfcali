@@ -103,7 +103,17 @@ export const api = {
       }),
     ).then((r) => r.watch),
 
-  patchWatch: (id: number, patch: { active?: boolean; autoBook?: boolean }) =>
+  patchWatch: (
+    id: number,
+    patch: {
+      active?: boolean
+      autoBook?: boolean
+      adaOnly?: boolean
+      siteFilter?: string | null
+      minNights?: number
+      dateRanges?: DateRange[]
+    },
+  ) =>
     json<{ watch: Watch }>(
       fetch(`/api/watches/${id}`, {
         method: 'PATCH',

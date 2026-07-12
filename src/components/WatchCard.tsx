@@ -12,8 +12,13 @@ import {
   CircleSlash,
   TriangleAlert,
   Clock,
+  Pencil,
+  Plus,
+  X,
+  Check,
+  Accessibility,
 } from 'lucide-react'
-import { api, formatDateRange, type Watch } from '../lib/api'
+import { api, formatDateRange, nightsBetween, type DateRange, type Watch } from '../lib/api'
 
 type Props = {
   watch: Watch
@@ -47,6 +52,13 @@ function fmtNight(d: string) {
 export function WatchCard({ watch, onChange, onRemove }: Props) {
   const [polling, setPolling] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+  const [ranges, setRanges] = useState<DateRange[]>(watch.dateRanges)
+  const [minNights, setMinNights] = useState(watch.minNights)
+  const [siteFilter, setSiteFilter] = useState(watch.siteFilter ?? '')
+  const [adaOnly, setAdaOnly] = useState(watch.adaOnly)
 
   const available = watch.availableCount > 0
   const url = bookingUrl(watch)
@@ -78,6 +90,53 @@ export function WatchCard({ watch, onChange, onRemove }: Props) {
       onRemove(watch.id)
     } finally {
       setBusy(false)
+    }
+  }
+
+  function startEdit() {
+    setRanges(watch.dateRanges)
+    setMinNights(watch.minNights)
+    setSiteFilter(watch.siteFilter ?? '')
+    setAdaOnly(watch.adaOnly)
+    setEditError(null)
+    setEditing(true)
+  }
+
+  function updateRange(index: number, patch: Partial<DateRange>) {
+    setRanges((rs) => rs.map((r, i) => (i === index ? { ...r, ...patch } : r)))
+  }
+
+  function addRange() {
+    setRanges((rs) => [...rs, { startDate: rs[0].startDate, endDate: rs[0].endDate }])
+  }
+
+  function removeRange(index: number) {
+    setRanges((rs) => rs.filter((_, i) => i !== index))
+  }
+
+  async function saveEdit() {
+    const badRange = ranges.find((r) => r.endDate <= r.startDate)
+    if (badRange) {
+      setEditError('Check-out must be after check-in for every date range.')
+      return
+    }
+    setEditError(null)
+    setSaving(true)
+    try {
+      const maxWindow = Math.max(...ranges.map((r) => nightsBetween(r.startDate, r.endDate)))
+      onChange(
+        await api.patchWatch(watch.id, {
+          dateRanges: ranges,
+          minNights: Math.min(minNights, maxWindow),
+          siteFilter: siteFilter.trim() || null,
+          adaOnly,
+        }),
+      )
+      setEditing(false)
+    } catch (e) {
+      setEditError((e as Error).message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -136,33 +195,129 @@ export function WatchCard({ watch, onChange, onRemove }: Props) {
           )}
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-pine-soft">
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <Tent className="h-4 w-4 shrink-0 text-ocean" />
-            {watch.dateRanges.map((r, i) => (
-              <span key={i} className="flex items-center gap-2">
-                {i > 0 && <span className="text-pine/30">+</span>}
-                {formatDateRange(r.startDate, r.endDate)}
-              </span>
-            ))}
-          </span>
-          <span className="text-pine/30">•</span>
-          <span>
-            {watch.minNights} night{watch.minNights > 1 ? 's' : ''} min
-          </span>
-          {watch.siteFilter && (
-            <>
-              <span className="text-pine/30">•</span>
-              <span>“{watch.siteFilter}”</span>
-            </>
-          )}
-          {watch.adaOnly && (
-            <>
-              <span className="text-pine/30">•</span>
-              <span>ADA only</span>
-            </>
-          )}
-        </div>
+        {editing ? (
+          <div className="mt-4 space-y-3 rounded-2xl border border-dashed border-ocean/30 bg-ocean/5 p-4">
+            <div className="space-y-2">
+              {ranges.map((r, i) => (
+                <div key={i} className="flex items-end gap-2">
+                  <div className="grid flex-1 gap-2 sm:grid-cols-2">
+                    <input
+                      type="date"
+                      value={r.startDate}
+                      onChange={(e) => updateRange(i, { startDate: e.target.value })}
+                      className="w-full rounded-lg border border-pine/15 bg-white px-3 py-2 text-sm text-pine outline-none focus:border-ocean"
+                    />
+                    <input
+                      type="date"
+                      value={r.endDate}
+                      onChange={(e) => updateRange(i, { endDate: e.target.value })}
+                      className="w-full rounded-lg border border-pine/15 bg-white px-3 py-2 text-sm text-pine outline-none focus:border-ocean"
+                    />
+                  </div>
+                  {ranges.length > 1 && (
+                    <button
+                      onClick={() => removeRange(i)}
+                      title="Remove this date range"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-pine/12 text-pine-soft transition hover:border-clay/40 hover:text-clay"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={addRange}
+                className="flex items-center gap-1.5 text-xs font-semibold text-ocean-deep hover:underline"
+              >
+                <Plus className="h-3.5 w-3.5" /> Add another date range
+              </button>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className="text-xs">
+                <span className="mb-1 block font-semibold text-pine-soft">Min nights</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={minNights}
+                  onChange={(e) => setMinNights(Math.max(1, Number(e.target.value)))}
+                  className="w-full rounded-lg border border-pine/15 bg-white px-3 py-2 text-sm text-pine outline-none focus:border-ocean"
+                />
+              </label>
+              <label className="text-xs">
+                <span className="mb-1 block font-semibold text-pine-soft">Site filter</span>
+                <input
+                  value={siteFilter}
+                  onChange={(e) => setSiteFilter(e.target.value)}
+                  placeholder="e.g. “walk-in”, “#12”"
+                  className="w-full rounded-lg border border-pine/15 bg-white px-3 py-2 text-sm text-pine outline-none focus:border-ocean"
+                />
+              </label>
+            </div>
+
+            <button
+              onClick={() => setAdaOnly((v) => !v)}
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                adaOnly
+                  ? 'border-ocean bg-ocean/10 text-ocean-deep'
+                  : 'border-pine/12 bg-white text-pine-soft hover:border-ocean/40'
+              }`}
+            >
+              <Accessibility className="h-3.5 w-3.5" /> ADA sites only
+            </button>
+
+            {editError && (
+              <p className="rounded-lg bg-clay/10 px-3 py-2 text-xs font-medium text-clay">
+                {editError}
+              </p>
+            )}
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={saveEdit}
+                disabled={saving}
+                className="flex items-center gap-1.5 rounded-lg bg-sunset px-4 py-2 text-sm font-bold text-paper shadow transition hover:bg-clay disabled:opacity-60"
+              >
+                <Check className="h-4 w-4" /> Save
+              </button>
+              <button
+                onClick={() => setEditing(false)}
+                disabled={saving}
+                className="rounded-lg border border-pine/12 px-4 py-2 text-sm font-semibold text-pine-soft transition hover:border-pine/25"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-pine-soft">
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <Tent className="h-4 w-4 shrink-0 text-ocean" />
+              {watch.dateRanges.map((r, i) => (
+                <span key={i} className="flex items-center gap-2">
+                  {i > 0 && <span className="text-pine/30">+</span>}
+                  {formatDateRange(r.startDate, r.endDate)}
+                </span>
+              ))}
+            </span>
+            <span className="text-pine/30">•</span>
+            <span>
+              {watch.minNights} night{watch.minNights > 1 ? 's' : ''} min
+            </span>
+            {watch.siteFilter && (
+              <>
+                <span className="text-pine/30">•</span>
+                <span>“{watch.siteFilter}”</span>
+              </>
+            )}
+            {watch.adaOnly && (
+              <>
+                <span className="text-pine/30">•</span>
+                <span>ADA only</span>
+              </>
+            )}
+          </div>
+        )}
 
         {/* open units */}
         {available && (
@@ -204,17 +359,22 @@ export function WatchCard({ watch, onChange, onRemove }: Props) {
           <span className="flex items-center gap-1.5 text-xs text-pine-soft">
             <Clock className="h-3.5 w-3.5" /> {relativeTime(watch.lastCheckedAt)}
           </span>
-          <div className="flex items-center gap-1">
-            <IconButton onClick={poll} busy={polling} title="Check now">
-              <RefreshCw className={`h-4 w-4 ${polling ? 'animate-spin' : ''}`} />
-            </IconButton>
-            <IconButton onClick={toggleActive} busy={busy} title={watch.active ? 'Pause' : 'Resume'}>
-              {watch.active ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            </IconButton>
-            <IconButton onClick={remove} busy={busy} title="Delete" danger>
-              <Trash2 className="h-4 w-4" />
-            </IconButton>
-          </div>
+          {!editing && (
+            <div className="flex items-center gap-1">
+              <IconButton onClick={startEdit} title="Edit tracker">
+                <Pencil className="h-4 w-4" />
+              </IconButton>
+              <IconButton onClick={poll} busy={polling} title="Check now">
+                <RefreshCw className={`h-4 w-4 ${polling ? 'animate-spin' : ''}`} />
+              </IconButton>
+              <IconButton onClick={toggleActive} busy={busy} title={watch.active ? 'Pause' : 'Resume'}>
+                {watch.active ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              </IconButton>
+              <IconButton onClick={remove} busy={busy} title="Delete" danger>
+                <Trash2 className="h-4 w-4" />
+              </IconButton>
+            </div>
+          )}
         </div>
       </div>
     </article>
