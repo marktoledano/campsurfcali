@@ -9,13 +9,25 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiWatchesRouteImport } from './routes/api/watches'
 import { Route as ApiSearchRouteImport } from './routes/api/search'
 import { Route as ApiPollRouteImport } from './routes/api/poll'
 import { Route as ApiMatchesRouteImport } from './routes/api/matches'
 import { Route as ApiWatchesIdRouteImport } from './routes/api/watches.$id'
+import { Route as ApiAuthRegisterRouteImport } from './routes/api/auth.register'
+import { Route as ApiAuthMeRouteImport } from './routes/api/auth.me'
+import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth.logout'
+import { Route as ApiAuthLoginRouteImport } from './routes/api/auth.login'
+import { Route as ApiAdminUsersRouteImport } from './routes/api/admin.users'
+import { Route as ApiAdminUsersIdRouteImport } from './routes/api/admin.users.$id'
 
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -46,69 +58,154 @@ const ApiWatchesIdRoute = ApiWatchesIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => ApiWatchesRoute,
 } as any)
+const ApiAuthRegisterRoute = ApiAuthRegisterRouteImport.update({
+  id: '/api/auth/register',
+  path: '/api/auth/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthMeRoute = ApiAuthMeRouteImport.update({
+  id: '/api/auth/me',
+  path: '/api/auth/me',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthLogoutRoute = ApiAuthLogoutRouteImport.update({
+  id: '/api/auth/logout',
+  path: '/api/auth/logout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthLoginRoute = ApiAuthLoginRouteImport.update({
+  id: '/api/auth/login',
+  path: '/api/auth/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminUsersRoute = ApiAdminUsersRouteImport.update({
+  id: '/api/admin/users',
+  path: '/api/admin/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminUsersIdRoute = ApiAdminUsersIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ApiAdminUsersRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/api/matches': typeof ApiMatchesRoute
   '/api/poll': typeof ApiPollRoute
   '/api/search': typeof ApiSearchRoute
   '/api/watches': typeof ApiWatchesRouteWithChildren
+  '/api/admin/users': typeof ApiAdminUsersRouteWithChildren
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/auth/me': typeof ApiAuthMeRoute
+  '/api/auth/register': typeof ApiAuthRegisterRoute
   '/api/watches/$id': typeof ApiWatchesIdRoute
+  '/api/admin/users/$id': typeof ApiAdminUsersIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/api/matches': typeof ApiMatchesRoute
   '/api/poll': typeof ApiPollRoute
   '/api/search': typeof ApiSearchRoute
   '/api/watches': typeof ApiWatchesRouteWithChildren
+  '/api/admin/users': typeof ApiAdminUsersRouteWithChildren
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/auth/me': typeof ApiAuthMeRoute
+  '/api/auth/register': typeof ApiAuthRegisterRoute
   '/api/watches/$id': typeof ApiWatchesIdRoute
+  '/api/admin/users/$id': typeof ApiAdminUsersIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/api/matches': typeof ApiMatchesRoute
   '/api/poll': typeof ApiPollRoute
   '/api/search': typeof ApiSearchRoute
   '/api/watches': typeof ApiWatchesRouteWithChildren
+  '/api/admin/users': typeof ApiAdminUsersRouteWithChildren
+  '/api/auth/login': typeof ApiAuthLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/auth/me': typeof ApiAuthMeRoute
+  '/api/auth/register': typeof ApiAuthRegisterRoute
   '/api/watches/$id': typeof ApiWatchesIdRoute
+  '/api/admin/users/$id': typeof ApiAdminUsersIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/api/matches'
     | '/api/poll'
     | '/api/search'
     | '/api/watches'
+    | '/api/admin/users'
+    | '/api/auth/login'
+    | '/api/auth/logout'
+    | '/api/auth/me'
+    | '/api/auth/register'
     | '/api/watches/$id'
+    | '/api/admin/users/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/api/matches'
     | '/api/poll'
     | '/api/search'
     | '/api/watches'
+    | '/api/admin/users'
+    | '/api/auth/login'
+    | '/api/auth/logout'
+    | '/api/auth/me'
+    | '/api/auth/register'
     | '/api/watches/$id'
+    | '/api/admin/users/$id'
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/api/matches'
     | '/api/poll'
     | '/api/search'
     | '/api/watches'
+    | '/api/admin/users'
+    | '/api/auth/login'
+    | '/api/auth/logout'
+    | '/api/auth/me'
+    | '/api/auth/register'
     | '/api/watches/$id'
+    | '/api/admin/users/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   ApiMatchesRoute: typeof ApiMatchesRoute
   ApiPollRoute: typeof ApiPollRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiWatchesRoute: typeof ApiWatchesRouteWithChildren
+  ApiAdminUsersRoute: typeof ApiAdminUsersRouteWithChildren
+  ApiAuthLoginRoute: typeof ApiAuthLoginRoute
+  ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
+  ApiAuthMeRoute: typeof ApiAuthMeRoute
+  ApiAuthRegisterRoute: typeof ApiAuthRegisterRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -151,6 +248,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWatchesIdRouteImport
       parentRoute: typeof ApiWatchesRoute
     }
+    '/api/auth/register': {
+      id: '/api/auth/register'
+      path: '/api/auth/register'
+      fullPath: '/api/auth/register'
+      preLoaderRoute: typeof ApiAuthRegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/me': {
+      id: '/api/auth/me'
+      path: '/api/auth/me'
+      fullPath: '/api/auth/me'
+      preLoaderRoute: typeof ApiAuthMeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/logout': {
+      id: '/api/auth/logout'
+      path: '/api/auth/logout'
+      fullPath: '/api/auth/logout'
+      preLoaderRoute: typeof ApiAuthLogoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/login': {
+      id: '/api/auth/login'
+      path: '/api/auth/login'
+      fullPath: '/api/auth/login'
+      preLoaderRoute: typeof ApiAuthLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/users': {
+      id: '/api/admin/users'
+      path: '/api/admin/users'
+      fullPath: '/api/admin/users'
+      preLoaderRoute: typeof ApiAdminUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/users/$id': {
+      id: '/api/admin/users/$id'
+      path: '/$id'
+      fullPath: '/api/admin/users/$id'
+      preLoaderRoute: typeof ApiAdminUsersIdRouteImport
+      parentRoute: typeof ApiAdminUsersRoute
+    }
   }
 }
 
@@ -166,12 +305,30 @@ const ApiWatchesRouteWithChildren = ApiWatchesRoute._addFileChildren(
   ApiWatchesRouteChildren,
 )
 
+interface ApiAdminUsersRouteChildren {
+  ApiAdminUsersIdRoute: typeof ApiAdminUsersIdRoute
+}
+
+const ApiAdminUsersRouteChildren: ApiAdminUsersRouteChildren = {
+  ApiAdminUsersIdRoute: ApiAdminUsersIdRoute,
+}
+
+const ApiAdminUsersRouteWithChildren = ApiAdminUsersRoute._addFileChildren(
+  ApiAdminUsersRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   ApiMatchesRoute: ApiMatchesRoute,
   ApiPollRoute: ApiPollRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiWatchesRoute: ApiWatchesRouteWithChildren,
+  ApiAdminUsersRoute: ApiAdminUsersRouteWithChildren,
+  ApiAuthLoginRoute: ApiAuthLoginRoute,
+  ApiAuthLogoutRoute: ApiAuthLogoutRoute,
+  ApiAuthMeRoute: ApiAuthMeRoute,
+  ApiAuthRegisterRoute: ApiAuthRegisterRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

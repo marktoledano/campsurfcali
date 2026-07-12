@@ -20,8 +20,19 @@ import {
   Accessibility,
   ChevronRight,
   Loader2,
+  Clock3,
 } from 'lucide-react'
-import { api, formatDateRange, nightsBetween, type DateRange, type Watch } from '../lib/api'
+import {
+  api,
+  formatDateRange,
+  formatFrequency,
+  frequencyToMinutes,
+  minutesToFrequency,
+  nightsBetween,
+  type DateRange,
+  type FrequencyUnit,
+  type Watch,
+} from '../lib/api'
 import { useSitePicker } from '../lib/useSitePicker'
 import { SitePickerFields } from './SitePickerFields'
 
@@ -66,6 +77,9 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
   const [minNights, setMinNights] = useState(watch.minNights)
   const [siteFilter, setSiteFilter] = useState(watch.siteFilter ?? '')
   const [adaOnly, setAdaOnly] = useState(watch.adaOnly)
+  const initialFreq = minutesToFrequency(watch.checkFrequencyMinutes)
+  const [freqValue, setFreqValue] = useState(initialFreq.value)
+  const [freqUnit, setFreqUnit] = useState<FrequencyUnit>(initialFreq.unit)
 
   const [cloning, setCloning] = useState(false)
   const [cloneSaving, setCloneSaving] = useState(false)
@@ -110,6 +124,9 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
     setMinNights(watch.minNights)
     setSiteFilter(watch.siteFilter ?? '')
     setAdaOnly(watch.adaOnly)
+    const freq = minutesToFrequency(watch.checkFrequencyMinutes)
+    setFreqValue(freq.value)
+    setFreqUnit(freq.unit)
     setEditError(null)
     setCloning(false)
     setEditing(true)
@@ -150,6 +167,7 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
           minNights: Math.min(minNights, maxWindow),
           siteFilter: siteFilter.trim() || null,
           adaOnly,
+          checkFrequencyMinutes: frequencyToMinutes(freqValue, freqUnit),
         }),
       )
       setEditing(false)
@@ -170,7 +188,6 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
     setCloneSaving(true)
     try {
       const created = await api.createWatch({
-        email: watch.email,
         parkName: park.name,
         facilityName: facility.name,
         placeId: park.placeId,
@@ -180,6 +197,7 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
         siteFilter: watch.siteFilter,
         adaOnly: watch.adaOnly,
         autoBook: watch.autoBook,
+        checkFrequencyMinutes: watch.checkFrequencyMinutes,
       })
       onCloned(created)
       setCloning(false)
@@ -361,6 +379,30 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
                   </label>
                 </div>
 
+                <label className="block text-xs">
+                  <span className="mb-1 flex items-center gap-1.5 font-semibold text-pine-soft">
+                    <Clock3 className="h-3.5 w-3.5" /> Check frequency
+                  </span>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      value={freqValue}
+                      onChange={(e) => setFreqValue(Math.max(1, Number(e.target.value)))}
+                      className="w-full rounded-lg border border-pine/15 bg-white px-3 py-2 text-sm text-pine outline-none focus:border-ocean"
+                    />
+                    <select
+                      value={freqUnit}
+                      onChange={(e) => setFreqUnit(e.target.value as FrequencyUnit)}
+                      className="rounded-lg border border-pine/15 bg-white px-3 py-2 text-sm text-pine outline-none focus:border-ocean"
+                    >
+                      <option value="minutes">minutes</option>
+                      <option value="hours">hours</option>
+                      <option value="days">days</option>
+                    </select>
+                  </div>
+                </label>
+
                 <button
                   onClick={() => setAdaOnly((v) => !v)}
                   className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
@@ -422,6 +464,10 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
                     <span>ADA only</span>
                   </>
                 )}
+                <span className="text-pine/30">•</span>
+                <span className="flex items-center gap-1">
+                  <Clock3 className="h-3.5 w-3.5" /> {formatFrequency(watch.checkFrequencyMinutes)}
+                </span>
               </div>
             )}
 

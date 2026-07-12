@@ -1,22 +1,33 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "../../../db/index.js";
 import { watches, type DateRange } from "../../../db/schema.js";
+import { getSessionUser } from "../../../lib/auth.js";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const MIN_CHECK_FREQUENCY_MINUTES = 5;
 
 /**
- *   PATCH  /api/watches/:id  -> toggle active / autoBook, or edit the tracker's
- *                               date ranges / min nights / site filter / ADA flag
- *   DELETE /api/watches/:id  -> remove a watch (and its matches, via cascade)
+ *   PATCH  /api/watches/:id  -> toggle active / autoBook, edit the tracker's
+ *                               date ranges / min nights / site filter / ADA
+ *                               flag / check frequency (owner only)
+ *   DELETE /api/watches/:id  -> remove a watch (and its matches, via cascade) (owner only)
  */
 export const Route = createFileRoute("/api/watches/$id")({
   server: {
     handlers: {
       PATCH: async ({ request, params }) => {
+        const user = await getSessionUser(request);
+        if (!user) return Response.json({ error: "unauthorized" }, { status: 401 });
+
         const id = Number(params.id);
         if (Number.isNaN(id))
           return Response.json({ error: "invalid id" }, { status: 400 });
+
+        const [existing] = await db.select().from(watches).where(eq(watches.id, id));
+        if (!existing) return Response.json({ error: "not found" }, { status: 404 });
+        if (existing.userId !== user.id)
+          return Response.json({ error: "forbidden" }, { status: 403 });
 
         const body: any = await request.json().catch(() => ({}));
         const patch: Record<string, unknown> = {};
@@ -27,6 +38,16 @@ export const Route = createFileRoute("/api/watches/$id")({
           patch.siteFilter = body.siteFilter
             ? String(body.siteFilter).trim()
             : null;
+
+        if (typeof body.checkFrequencyMinutes !== "undefined") {
+          const n = Number(body.checkFrequencyMinutes);
+          if (!Number.isFinite(n) || n < MIN_CHECK_FREQUENCY_MINUTES)
+            return Response.json(
+              { error: `checkFrequencyMinutes must be at least ${MIN_CHECK_FREQUENCY_MINUTES}` },
+              { status: 400 },
+            );
+          patch.checkFrequencyMinutes = Math.floor(n);
+        }
 
         if (typeof body.minNights !== "undefined") {
           const n = Number(body.minNights);
@@ -79,11 +100,20 @@ export const Route = createFileRoute("/api/watches/$id")({
         return Response.json({ watch: updated });
       },
 
-      DELETE: async ({ params }) => {
+      DELETE: async ({ request, params }) => {
+        const user = await getSessionUser(request);
+        if (!user) return Response.json({ error: "unauthorized" }, { status: 401 });
+
         const id = Number(params.id);
         if (Number.isNaN(id))
           return Response.json({ error: "invalid id" }, { status: 400 });
-        await db.delete(watches).where(eq(watches.id, id));
+
+        const [existing] = await db.select().from(watches).where(eq(watches.id, id));
+        if (!existing) return Response.json({ error: "not found" }, { status: 404 });
+        if (existing.userId !== user.id)
+          return Response.json({ error: "forbidden" }, { status: 403 });
+
+        await db.delete(watches).where(and(eq(watches.id, id), eq(watches.userId, user.id)));
         return new Response(null, { status: 204 });
       },
     },

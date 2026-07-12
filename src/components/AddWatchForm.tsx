@@ -6,13 +6,20 @@ import {
   Plus,
   Loader2,
   X,
+  Clock3,
 } from 'lucide-react'
-import { api, nightsBetween, type DateRange, type NewWatchInput } from '../lib/api'
+import {
+  api,
+  frequencyToMinutes,
+  nightsBetween,
+  type DateRange,
+  type FrequencyUnit,
+  type NewWatchInput,
+} from '../lib/api'
 import { useSitePicker } from '../lib/useSitePicker'
 import { SitePickerFields } from './SitePickerFields'
 
 type Props = {
-  email: string
   onCreated: () => void
 }
 
@@ -30,7 +37,7 @@ function defaultRange(): DateRange {
   return { startDate: tomorrow(), endDate: plusDays(tomorrow(), 2) }
 }
 
-export function AddWatchForm({ email, onCreated }: Props) {
+export function AddWatchForm({ onCreated }: Props) {
   const [ranges, setRanges] = useState<DateRange[]>([defaultRange()])
   const picker = useSitePicker(ranges[0].startDate)
   const { park, facility } = picker
@@ -39,6 +46,8 @@ export function AddWatchForm({ email, onCreated }: Props) {
   const [siteFilter, setSiteFilter] = useState('')
   const [adaOnly, setAdaOnly] = useState(false)
   const [autoBook, setAutoBook] = useState(false)
+  const [freqValue, setFreqValue] = useState(5)
+  const [freqUnit, setFreqUnit] = useState<FrequencyUnit>('minutes')
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -66,7 +75,6 @@ export function AddWatchForm({ email, onCreated }: Props) {
     setSubmitting(true)
     const maxWindow = Math.max(...ranges.map((r) => nightsBetween(r.startDate, r.endDate)))
     const input: NewWatchInput = {
-      email,
       parkName: park.name,
       facilityName: facility.name,
       placeId: park.placeId,
@@ -76,6 +84,7 @@ export function AddWatchForm({ email, onCreated }: Props) {
       siteFilter: siteFilter.trim() || null,
       adaOnly,
       autoBook,
+      checkFrequencyMinutes: frequencyToMinutes(freqValue, freqUnit),
     }
     try {
       await api.createWatch(input)
@@ -85,6 +94,8 @@ export function AddWatchForm({ email, onCreated }: Props) {
       setSiteFilter('')
       setAdaOnly(false)
       setAutoBook(false)
+      setFreqValue(5)
+      setFreqUnit('minutes')
       onCreated()
     } catch (e) {
       setError((e as Error).message)
@@ -191,6 +202,27 @@ export function AddWatchForm({ email, onCreated }: Props) {
                 />
               </Field>
             </div>
+
+            <Field label="Check frequency" icon={<Clock3 className="h-4 w-4 text-ocean" />}>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  value={freqValue}
+                  onChange={(e) => setFreqValue(Math.max(1, Number(e.target.value)))}
+                  className="w-full rounded-xl border border-pine/15 bg-sand/60 px-3 py-2.5 text-pine outline-none focus:border-ocean focus:bg-white"
+                />
+                <select
+                  value={freqUnit}
+                  onChange={(e) => setFreqUnit(e.target.value as FrequencyUnit)}
+                  className="rounded-xl border border-pine/15 bg-sand/60 px-3 py-2.5 text-pine outline-none focus:border-ocean focus:bg-white"
+                >
+                  <option value="minutes">minutes</option>
+                  <option value="hours">hours</option>
+                  <option value="days">days</option>
+                </select>
+              </div>
+            </Field>
 
             <div className="flex flex-col gap-3 sm:flex-row">
               <Toggle

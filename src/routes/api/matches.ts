@@ -2,19 +2,19 @@ import { createFileRoute } from "@tanstack/react-router";
 import { desc, eq } from "drizzle-orm";
 import { db } from "../../../db/index.js";
 import { matches, watches } from "../../../db/schema.js";
+import { getSessionUser } from "../../../lib/auth.js";
 
 /**
- * The notification feed: every detected availability event for a user's
- * watches, newest first.
- *   GET /api/matches?email=...
+ * The notification feed: every detected availability event for the
+ * logged-in user's watches, newest first.
+ *   GET /api/matches
  */
 export const Route = createFileRoute("/api/matches")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const email = new URL(request.url).searchParams.get("email")?.trim();
-        if (!email)
-          return Response.json({ error: "email is required" }, { status: 400 });
+        const user = await getSessionUser(request);
+        if (!user) return Response.json({ error: "unauthorized" }, { status: 401 });
 
         const rows = await db
           .select({
@@ -30,7 +30,7 @@ export const Route = createFileRoute("/api/matches")({
           })
           .from(matches)
           .innerJoin(watches, eq(matches.watchId, watches.id))
-          .where(eq(watches.email, email))
+          .where(eq(watches.userId, user.id))
           .orderBy(desc(matches.createdAt))
           .limit(100);
 

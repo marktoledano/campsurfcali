@@ -24,12 +24,23 @@ export type Watch = {
   adaOnly: boolean
   autoBook: boolean
   active: boolean
+  checkFrequencyMinutes: number
   lastCheckedAt: string | null
   lastResult: string
   availableCount: number
   currentAvailability: AvailableUnit[]
   createdAt: string | null
 }
+
+export type AuthUser = {
+  id: number
+  username: string
+  email: string
+  isAdmin: boolean
+  createdAt: string | null
+}
+
+export type AdminUserRow = AuthUser & { trackerCount: number }
 
 export type ParkResult = {
   placeId: number
@@ -57,7 +68,6 @@ export type MatchRow = {
 }
 
 export type NewWatchInput = {
-  email: string
   parkName: string
   facilityName: string
   placeId: number
@@ -67,6 +77,7 @@ export type NewWatchInput = {
   siteFilter: string | null
   adaOnly: boolean
   autoBook: boolean
+  checkFrequencyMinutes?: number
 }
 
 async function json<T>(resOrPromise: Response | Promise<Response>): Promise<T> {
@@ -89,10 +100,8 @@ export const api = {
       fetch(`/api/search?placeId=${placeId}&start=${start}`),
     ).then((r) => r.facilities),
 
-  listWatches: (email: string) =>
-    json<{ watches: Watch[] }>(
-      fetch(`/api/watches?email=${encodeURIComponent(email)}`),
-    ).then((r) => r.watches),
+  listWatches: () =>
+    json<{ watches: Watch[] }>(fetch('/api/watches')).then((r) => r.watches),
 
   createWatch: (input: NewWatchInput) =>
     json<{ watch: Watch }>(
@@ -112,6 +121,7 @@ export const api = {
       siteFilter?: string | null
       minNights?: number
       dateRanges?: DateRange[]
+      checkFrequencyMinutes?: number
     },
   ) =>
     json<{ watch: Watch }>(
@@ -127,6 +137,15 @@ export const api = {
       if (!res.ok && res.status !== 204) throw new Error('Failed to delete')
     }),
 
+  setFrequencyForAll: (checkFrequencyMinutes: number) =>
+    json<{ watches: Watch[] }>(
+      fetch('/api/watches', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ checkFrequencyMinutes }),
+      }),
+    ).then((r) => r.watches),
+
   pollNow: (watchId: number) =>
     json<{ watch: Watch }>(
       fetch('/api/poll', {
@@ -136,10 +155,47 @@ export const api = {
       }),
     ).then((r) => r.watch),
 
-  listMatches: (email: string) =>
-    json<{ matches: MatchRow[] }>(
-      fetch(`/api/matches?email=${encodeURIComponent(email)}`),
-    ).then((r) => r.matches),
+  listMatches: () =>
+    json<{ matches: MatchRow[] }>(fetch('/api/matches')).then((r) => r.matches),
+
+  register: (input: { username: string; email: string; password: string; confirmPassword: string }) =>
+    json<{ user: AuthUser }>(
+      fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      }),
+    ).then((r) => r.user),
+
+  login: (input: { username: string; password: string }) =>
+    json<{ user: AuthUser }>(
+      fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      }),
+    ).then((r) => r.user),
+
+  logout: () => fetch('/api/auth/logout', { method: 'POST' }).then(() => {}),
+
+  me: () => json<{ user: AuthUser | null }>(fetch('/api/auth/me')).then((r) => r.user),
+
+  adminListUsers: () =>
+    json<{ users: AdminUserRow[] }>(fetch('/api/admin/users')).then((r) => r.users),
+
+  adminSetAdmin: (id: number, isAdmin: boolean) =>
+    json<{ user: AuthUser }>(
+      fetch(`/api/admin/users/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isAdmin }),
+      }),
+    ).then((r) => r.user),
+
+  adminDeleteUser: (id: number) =>
+    fetch(`/api/admin/users/${id}`, { method: 'DELETE' }).then((res) => {
+      if (!res.ok && res.status !== 204) throw new Error('Failed to delete user')
+    }),
 }
 
 /** Compact date range formatting for display, e.g. "Aug 3 – Aug 6". */
@@ -157,4 +213,27 @@ export function nightsBetween(start: string, end: string): number {
   const a = new Date(start + 'T00:00:00Z').getTime()
   const b = new Date(end + 'T00:00:00Z').getTime()
   return Math.max(1, Math.round((b - a) / 86_400_000))
+}
+
+export const MIN_CHECK_FREQUENCY_MINUTES = 5
+
+export type FrequencyUnit = 'minutes' | 'hours' | 'days'
+
+/** Break a minutes value into the largest clean {value, unit} for display/editing. */
+export function minutesToFrequency(minutes: number): { value: number; unit: FrequencyUnit } {
+  if (minutes % 1440 === 0 && minutes >= 1440) return { value: minutes / 1440, unit: 'days' }
+  if (minutes % 60 === 0 && minutes >= 60) return { value: minutes / 60, unit: 'hours' }
+  return { value: minutes, unit: 'minutes' }
+}
+
+export function frequencyToMinutes(value: number, unit: FrequencyUnit): number {
+  const perUnit = unit === 'days' ? 1440 : unit === 'hours' ? 60 : 1
+  return Math.max(MIN_CHECK_FREQUENCY_MINUTES, Math.round(value * perUnit))
+}
+
+/** Compact display string, e.g. "every 15 min" / "every 2 hr" / "every 1 day". */
+export function formatFrequency(minutes: number): string {
+  const { value, unit } = minutesToFrequency(minutes)
+  const label = unit === 'minutes' ? 'min' : unit === 'hours' ? 'hr' : value === 1 ? 'day' : 'days'
+  return `every ${value} ${label}`
 }

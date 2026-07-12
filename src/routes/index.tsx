@@ -1,52 +1,41 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
-import {
-  Waves,
-  Compass,
-  BellRing,
-  CalendarClock,
-  ArrowRight,
-  LogOut,
-  Tent,
-} from 'lucide-react'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { useCallback, useEffect, useState } from 'react'
+import { Waves, LogOut, Tent, ShieldCheck } from 'lucide-react'
 import { AddWatchForm } from '../components/AddWatchForm'
 import { WatchCard } from '../components/WatchCard'
 import { NotificationsFeed } from '../components/NotificationsFeed'
-import { api, type MatchRow, type Watch } from '../lib/api'
+import { FrequencyControl } from '../components/FrequencyControl'
+import { AuthGate } from '../components/AuthGate'
+import { api, type AuthUser, type MatchRow, type Watch } from '../lib/api'
 
 export const Route = createFileRoute('/')({
   component: App,
 })
 
-const EMAIL_KEY = 'sctc:email'
-
 function App() {
-  const [email, setEmail] = useState<string | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    setEmail(localStorage.getItem(EMAIL_KEY))
-    setReady(true)
+    api
+      .me()
+      .then(setUser)
+      .finally(() => setReady(true))
   }, [])
 
-  function signIn(value: string) {
-    const clean = value.trim().toLowerCase()
-    localStorage.setItem(EMAIL_KEY, clean)
-    setEmail(clean)
-  }
-  function signOut() {
-    localStorage.removeItem(EMAIL_KEY)
-    setEmail(null)
+  async function signOut() {
+    await api.logout()
+    setUser(null)
   }
 
   if (!ready) return null
 
   return (
     <div className="relative z-10 min-h-screen">
-      {email ? (
-        <Dashboard email={email} onSignOut={signOut} />
+      {user ? (
+        <Dashboard user={user} onSignOut={signOut} />
       ) : (
-        <Landing onStart={signIn} />
+        <AuthGate onAuthenticated={setUser} />
       )}
       <Footer />
     </div>
@@ -55,112 +44,11 @@ function App() {
 
 /* ------------------------------------------------------------------ */
 
-function Landing({ onStart }: { onStart: (email: string) => void }) {
-  const [value, setValue] = useState('')
-  const [error, setError] = useState('')
-
-  function submit(e: FormEvent) {
-    e.preventDefault()
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value.trim())) {
-      setError('Enter a valid email so we know where to send alerts.')
-      return
-    }
-    onStart(value)
-  }
-
-  return (
-    <main className="mx-auto max-w-5xl px-5 py-16 sm:py-24">
-      <div className="flex items-center gap-2 text-ocean-deep">
-        <Waves className="h-6 w-6" />
-        <span className="font-display text-sm font-bold uppercase tracking-[0.3em]">
-          SurfCampTrackerCali
-        </span>
-      </div>
-
-      <h1 className="mt-10 max-w-3xl font-display text-5xl font-black leading-[0.98] text-pine sm:text-7xl">
-        The California coast is{' '}
-        <span className="text-ocean">booked solid.</span> We watch for the{' '}
-        <span className="text-sunset">cancellation.</span>
-      </h1>
-
-      <p className="mt-6 max-w-xl text-lg leading-relaxed text-pine-soft">
-        Point us at any ReserveCalifornia campground and your dates. We poll the
-        official availability grid every few minutes and ping you the instant a
-        site frees up — with a one-tap link straight to checkout.
-      </p>
-
-      <form
-        onSubmit={submit}
-        className="mt-10 flex max-w-md flex-col gap-3 sm:flex-row"
-      >
-        <input
-          type="email"
-          value={value}
-          onChange={(e) => {
-            setValue(e.target.value)
-            setError('')
-          }}
-          placeholder="you@example.com"
-          className="flex-1 rounded-xl border border-pine/15 bg-paper px-4 py-3.5 text-pine shadow-sm outline-none transition focus:border-ocean focus:ring-4 focus:ring-ocean/10"
-        />
-        <button
-          type="submit"
-          className="group flex items-center justify-center gap-2 rounded-xl bg-pine px-6 py-3.5 font-display font-bold text-sand transition hover:bg-ocean-deep"
-        >
-          Start tracking
-          <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
-        </button>
-      </form>
-      {error && <p className="mt-2 text-sm font-medium text-clay">{error}</p>}
-
-      <div className="mt-20 grid gap-6 sm:grid-cols-3">
-        <Feature
-          icon={<Compass className="h-5 w-5" />}
-          title="Every state park"
-          body="Search all ReserveCalifornia parks and campgrounds — from Big Sur to the Sierra."
-        />
-        <Feature
-          icon={<CalendarClock className="h-5 w-5" />}
-          title="Checked every 5 min"
-          body="A scheduled poller sweeps your dates around the clock so you don't have to."
-        />
-        <Feature
-          icon={<BellRing className="h-5 w-5" />}
-          title="Alert + quick-book"
-          body="Get an in-app alert (and email) with a direct link to grab the open site."
-        />
-      </div>
-    </main>
-  )
-}
-
-function Feature({
-  icon,
-  title,
-  body,
-}: {
-  icon: ReactNode
-  title: string
-  body: string
-}) {
-  return (
-    <div className="rounded-2xl border border-pine/10 bg-paper/70 p-6 backdrop-blur">
-      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-ocean/10 text-ocean">
-        {icon}
-      </div>
-      <h3 className="mt-4 font-display text-lg font-bold text-pine">{title}</h3>
-      <p className="mt-1.5 text-sm leading-relaxed text-pine-soft">{body}</p>
-    </div>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-
 function Dashboard({
-  email,
+  user,
   onSignOut,
 }: {
-  email: string
+  user: AuthUser
   onSignOut: () => void
 }) {
   const [watches, setWatches] = useState<Watch[]>([])
@@ -169,10 +57,7 @@ function Dashboard({
 
   const refresh = useCallback(async () => {
     try {
-      const [w, m] = await Promise.all([
-        api.listWatches(email),
-        api.listMatches(email),
-      ])
+      const [w, m] = await Promise.all([api.listWatches(), api.listMatches()])
       setWatches(w)
       setMatches(m)
     } catch {
@@ -180,7 +65,7 @@ function Dashboard({
     } finally {
       setLoading(false)
     }
-  }, [email])
+  }, [])
 
   useEffect(() => {
     refresh()
@@ -200,12 +85,20 @@ function Dashboard({
           </span>
         </div>
         <div className="flex items-center gap-3 text-sm text-pine-soft">
-          <span className="hidden sm:inline">{email}</span>
+          <span className="hidden sm:inline">{user.email}</span>
+          {user.isAdmin && (
+            <Link
+              to="/admin"
+              className="flex items-center gap-1.5 rounded-lg border border-pine/12 bg-paper/70 px-3 py-1.5 font-medium transition hover:border-pine/25"
+            >
+              <ShieldCheck className="h-3.5 w-3.5" /> admin
+            </Link>
+          )}
           <button
             onClick={onSignOut}
             className="flex items-center gap-1.5 rounded-lg border border-pine/12 bg-paper/70 px-3 py-1.5 font-medium transition hover:border-pine/25"
           >
-            <LogOut className="h-3.5 w-3.5" /> switch
+            <LogOut className="h-3.5 w-3.5" /> log out
           </button>
         </div>
       </header>
@@ -219,7 +112,14 @@ function Dashboard({
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[1.55fr_1fr]">
         <div className="space-y-6">
-          <AddWatchForm email={email} onCreated={refresh} />
+          <AddWatchForm onCreated={refresh} />
+
+          {watches.length > 0 && (
+            <FrequencyControl
+              watches={watches}
+              onAppliedToAll={(updated) => setWatches(updated)}
+            />
+          )}
 
           {loading ? (
             <div className="space-y-4">

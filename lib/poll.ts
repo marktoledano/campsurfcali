@@ -98,11 +98,20 @@ export async function pollWatch(watch: Watch): Promise<PollSummary> {
   }
 }
 
-/** Poll every active watch, spacing requests out to stay a polite client. */
+/** A watch is due once its own check-frequency interval has elapsed since the last poll. */
+function isDue(watch: Watch, now: number): boolean {
+  if (!watch.lastCheckedAt) return true;
+  const dueAt = watch.lastCheckedAt.getTime() + watch.checkFrequencyMinutes * 60_000;
+  return dueAt <= now;
+}
+
+/** Poll every active, due watch, spacing requests out to stay a polite client. */
 export async function pollAllWatches(): Promise<PollSummary[]> {
   const active = await db.select().from(watches).where(eq(watches.active, true));
+  const now = Date.now();
+  const due = active.filter((w) => isDue(w, now));
   const summaries: PollSummary[] = [];
-  for (const watch of active) {
+  for (const watch of due) {
     summaries.push(await pollWatch(watch));
     // ~1 request/second to ReserveCalifornia.
     await new Promise((r) => setTimeout(r, 1100));

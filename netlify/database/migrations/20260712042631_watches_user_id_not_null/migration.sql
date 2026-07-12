@@ -1,0 +1,1 @@
+ALTER TABLE "watches" ALTER COLUMN "user_id" SET NOT NULL;

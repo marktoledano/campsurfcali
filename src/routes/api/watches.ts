@@ -2,28 +2,34 @@ import { createFileRoute } from "@tanstack/react-router";
 import { desc, eq } from "drizzle-orm";
 import { db } from "../../../db/index.js";
 import { watches, type NewWatch, type DateRange } from "../../../db/schema.js";
+import { getSessionUser } from "../../../lib/auth.js";
+
+const MIN_CHECK_FREQUENCY_MINUTES = 5;
 
 /**
- *   GET  /api/watches?email=...  -> that user's watches (newest first)
- *   POST /api/watches            -> create a watch
+ *   GET   /api/watches           -> the logged-in user's watches (newest first)
+ *   POST  /api/watches           -> create a watch for the logged-in user
+ *   PATCH /api/watches           { checkFrequencyMinutes } -> bulk-apply to every one of the user's watches
  */
 export const Route = createFileRoute("/api/watches")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const email = new URL(request.url).searchParams.get("email")?.trim();
-        if (!email) {
-          return Response.json({ error: "email is required" }, { status: 400 });
-        }
+        const user = await getSessionUser(request);
+        if (!user) return Response.json({ error: "unauthorized" }, { status: 401 });
+
         const rows = await db
           .select()
           .from(watches)
-          .where(eq(watches.email, email))
+          .where(eq(watches.userId, user.id))
           .orderBy(desc(watches.createdAt));
         return Response.json({ watches: rows });
       },
 
       POST: async ({ request }) => {
+        const user = await getSessionUser(request);
+        if (!user) return Response.json({ error: "unauthorized" }, { status: 401 });
+
         let body: any;
         try {
           body = await request.json();
@@ -37,7 +43,8 @@ export const Route = createFileRoute("/api/watches")({
         }
 
         const values: NewWatch = {
-          email: String(body.email).trim().toLowerCase(),
+          userId: user.id,
+          email: user.email,
           parkName: String(body.parkName),
           facilityName: String(body.facilityName),
           placeId: Number(body.placeId),
@@ -50,21 +57,52 @@ export const Route = createFileRoute("/api/watches")({
           siteFilter: body.siteFilter ? String(body.siteFilter).trim() : null,
           adaOnly: Boolean(body.adaOnly),
           autoBook: Boolean(body.autoBook),
+          checkFrequencyMinutes: clampFrequency(body.checkFrequencyMinutes),
         };
 
         const [created] = await db.insert(watches).values(values).returning();
         return Response.json({ watch: created }, { status: 201 });
       },
+
+      PATCH: async ({ request }) => {
+        const user = await getSessionUser(request);
+        if (!user) return Response.json({ error: "unauthorized" }, { status: 401 });
+
+        const body: any = await request.json().catch(() => ({}));
+        const minutes = Number(body.checkFrequencyMinutes);
+        if (!Number.isFinite(minutes) || minutes < MIN_CHECK_FREQUENCY_MINUTES) {
+          return Response.json(
+            { error: `checkFrequencyMinutes must be at least ${MIN_CHECK_FREQUENCY_MINUTES}` },
+            { status: 400 },
+          );
+        }
+
+        await db
+          .update(watches)
+          .set({ checkFrequencyMinutes: Math.floor(minutes) })
+          .where(eq(watches.userId, user.id));
+
+        const rows = await db
+          .select()
+          .from(watches)
+          .where(eq(watches.userId, user.id))
+          .orderBy(desc(watches.createdAt));
+        return Response.json({ watches: rows });
+      },
     },
   },
 });
+
+function clampFrequency(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return MIN_CHECK_FREQUENCY_MINUTES;
+  return Math.max(MIN_CHECK_FREQUENCY_MINUTES, Math.floor(n));
+}
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 function validate(body: any): string[] {
   const errors: string[] = [];
-  if (!body?.email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(body.email)))
-    errors.push("a valid email is required");
   if (!body?.facilityId || Number.isNaN(Number(body.facilityId)))
     errors.push("facilityId is required");
   if (!body?.placeId || Number.isNaN(Number(body.placeId)))
