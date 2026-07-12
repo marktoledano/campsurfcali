@@ -253,6 +253,9 @@ function Dashboard({
                     setWatches((prev) => prev.filter((x) => x.id !== id))
                     refresh()
                   }}
+                  onCloned={(created) =>
+                    setWatches((prev) => [created, ...prev])
+                  }
                 />
               ))}
             </div>

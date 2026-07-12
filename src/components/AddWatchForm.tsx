@@ -1,24 +1,15 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import {
-  Search,
-  MapPin,
-  Tent,
   Calendar,
   Accessibility,
   Zap,
   Plus,
   Loader2,
-  ChevronLeft,
   X,
 } from 'lucide-react'
-import {
-  api,
-  nightsBetween,
-  type DateRange,
-  type FacilityResult,
-  type NewWatchInput,
-  type ParkResult,
-} from '../lib/api'
+import { api, nightsBetween, type DateRange, type NewWatchInput } from '../lib/api'
+import { useSitePicker } from '../lib/useSitePicker'
+import { SitePickerFields } from './SitePickerFields'
 
 type Props = {
   email: string
@@ -40,16 +31,10 @@ function defaultRange(): DateRange {
 }
 
 export function AddWatchForm({ email, onCreated }: Props) {
-  const [query, setQuery] = useState('')
-  const [parks, setParks] = useState<ParkResult[]>([])
-  const [searching, setSearching] = useState(false)
-  const [park, setPark] = useState<ParkResult | null>(null)
-
-  const [facilities, setFacilities] = useState<FacilityResult[]>([])
-  const [loadingFacilities, setLoadingFacilities] = useState(false)
-  const [facility, setFacility] = useState<FacilityResult | null>(null)
-
   const [ranges, setRanges] = useState<DateRange[]>([defaultRange()])
+  const picker = useSitePicker(ranges[0].startDate)
+  const { park, facility } = picker
+
   const [minNights, setMinNights] = useState(1)
   const [siteFilter, setSiteFilter] = useState('')
   const [adaOnly, setAdaOnly] = useState(false)
@@ -57,54 +42,6 @@ export function AddWatchForm({ email, onCreated }: Props) {
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const debounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-
-  // Debounced park search.
-  useEffect(() => {
-    if (park) return
-    if (query.trim().length < 2) {
-      setParks([])
-      return
-    }
-    setSearching(true)
-    clearTimeout(debounce.current)
-    debounce.current = setTimeout(async () => {
-      try {
-        setParks(await api.searchParks(query.trim()))
-      } catch {
-        setParks([])
-      } finally {
-        setSearching(false)
-      }
-    }, 350)
-    return () => clearTimeout(debounce.current)
-  }, [query, park])
-
-  async function pickPark(p: ParkResult) {
-    setPark(p)
-    setParks([])
-    setQuery(p.name)
-    setLoadingFacilities(true)
-    setError(null)
-    try {
-      const list = await api.getFacilities(p.placeId, ranges[0].startDate)
-      setFacilities(list)
-      if (list.length === 0)
-        setError('No campgrounds found for this park right now.')
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setLoadingFacilities(false)
-    }
-  }
-
-  function reset() {
-    setPark(null)
-    setFacility(null)
-    setFacilities([])
-    setQuery('')
-    setError(null)
-  }
 
   function updateRange(index: number, patch: Partial<DateRange>) {
     setRanges((rs) => rs.map((r, i) => (i === index ? { ...r, ...patch } : r)))
@@ -142,7 +79,7 @@ export function AddWatchForm({ email, onCreated }: Props) {
     }
     try {
       await api.createWatch(input)
-      reset()
+      picker.reset()
       setRanges([defaultRange()])
       setMinNights(1)
       setSiteFilter('')
@@ -170,85 +107,12 @@ export function AddWatchForm({ email, onCreated }: Props) {
       </div>
 
       <div className="space-y-6 px-6 py-7 sm:px-8">
-        {/* Step 1 — park search */}
-        <div>
-          <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-pine-soft">
-            <MapPin className="h-4 w-4 text-ocean" /> Park or recreation area
-          </label>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-pine/40" />
-            <input
-              value={query}
-              onChange={(e) => {
-                if (park) reset()
-                setQuery(e.target.value)
-              }}
-              placeholder="Try “Big Sur”, “Sonoma Coast”, “Crystal Cove”…"
-              className="w-full rounded-xl border border-pine/15 bg-sand/60 py-3 pl-11 pr-10 text-pine outline-none transition focus:border-ocean focus:bg-white focus:ring-4 focus:ring-ocean/10"
-            />
-            {searching && (
-              <Loader2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-ocean" />
-            )}
-          </div>
-
-          {parks.length > 0 && (
-            <ul className="mt-2 max-h-56 divide-y divide-pine/5 overflow-auto rounded-xl border border-pine/10 bg-white shadow-lg">
-              {parks.map((p) => (
-                <li key={p.placeId}>
-                  <button
-                    onClick={() => pickPark(p)}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-ocean/5"
-                  >
-                    <MapPin className="h-4 w-4 shrink-0 text-sunset" />
-                    <span className="text-sm font-medium text-pine">{p.name}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* Step 2 — facility */}
-        {park && (
-          <div className="rise">
-            <div className="mb-2 flex items-center justify-between">
-              <label className="flex items-center gap-2 text-sm font-semibold text-pine-soft">
-                <Tent className="h-4 w-4 text-ocean" /> Campground
-              </label>
-              <button
-                onClick={reset}
-                className="flex items-center gap-1 text-xs font-semibold text-clay hover:underline"
-              >
-                <ChevronLeft className="h-3 w-3" /> change park
-              </button>
-            </div>
-            {loadingFacilities ? (
-              <div className="grid gap-2 sm:grid-cols-2">
-                {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className="skeleton h-12 rounded-xl" />
-                ))}
-              </div>
-            ) : (
-              <div className="grid gap-2 sm:grid-cols-2">
-                {facilities.map((f) => {
-                  const on = facility?.facilityId === f.facilityId
-                  return (
-                    <button
-                      key={f.facilityId}
-                      onClick={() => setFacility(f)}
-                      className={`rounded-xl border px-4 py-3 text-left text-sm transition ${
-                        on
-                          ? 'border-ocean bg-ocean text-paper shadow-md'
-                          : 'border-pine/12 bg-sand/50 text-pine hover:border-ocean/50 hover:bg-white'
-                      }`}
-                    >
-                      <span className="font-semibold">{f.name}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
+        {/* Steps 1 & 2 — park + facility search */}
+        <SitePickerFields picker={picker} />
+        {picker.error && !facility && (
+          <p className="rounded-xl bg-clay/10 px-4 py-3 text-sm font-medium text-clay">
+            {picker.error}
+          </p>
         )}
 
         {/* Step 3 — dates + options */}
@@ -370,12 +234,6 @@ export function AddWatchForm({ email, onCreated }: Props) {
               Start tracking this campground
             </button>
           </div>
-        )}
-
-        {!park && error && (
-          <p className="rounded-xl bg-clay/10 px-4 py-3 text-sm font-medium text-clay">
-            {error}
-          </p>
         )}
       </div>
     </div>
