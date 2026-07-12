@@ -1,5 +1,6 @@
 import { Bell, ExternalLink, Mail, MonitorSmartphone, Ticket } from 'lucide-react'
 import type { MatchRow } from '../lib/api'
+import { ShareButton } from './ShareButton'
 
 function fmtWhen(iso: string | null): string {
   if (!iso) return ''
@@ -60,7 +61,7 @@ export function NotificationsFeed({ matches }: { matches: MatchRow[] }) {
                 — {m.dates.slice(0, 6).map(fmtNight).join(', ')}
                 {m.dates.length > 6 ? '…' : ''}
               </p>
-              <div className="mt-2 flex items-center gap-3">
+              <div className="mt-2 flex items-center gap-2">
                 <a
                   href={m.bookingUrl}
                   target="_blank"
@@ -71,7 +72,13 @@ export function NotificationsFeed({ matches }: { matches: MatchRow[] }) {
                     Book <ExternalLink className="ml-0.5 inline h-3 w-3" />
                   </span>
                 </a>
-                <span className="inline-flex items-center gap-1 text-[11px] text-sand/40">
+                <ShareButton
+                  url={m.bookingUrl}
+                  title={`${m.facilityName} — ${m.parkName}`}
+                  text={`${m.unitName} — ${m.dates.slice(0, 6).map(fmtNight).join(', ')} at ${m.facilityName}, ${m.parkName}`}
+                  dark
+                />
+                <span className="ml-1 inline-flex items-center gap-1 text-[11px] text-sand/40">
                   {m.notifyChannel === 'email' ? (
                     <>
                       <Mail className="h-3 w-3" /> emailed

@@ -35,6 +35,7 @@ import {
 } from '../lib/api'
 import { useSitePicker } from '../lib/useSitePicker'
 import { SitePickerFields } from './SitePickerFields'
+import { ShareButton } from './ShareButton'
 
 type Props = {
   watch: Watch
@@ -494,15 +495,22 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
                     </li>
                   )}
                 </ul>
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-sunset px-4 py-2 text-sm font-bold text-paper shadow transition hover:bg-clay"
-                >
-                  <Zap className="h-4 w-4" /> Book now on ReserveCalifornia
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </a>
+                <div className="mt-3 flex items-center gap-2">
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded-lg bg-sunset px-4 py-2 text-sm font-bold text-paper shadow transition hover:bg-clay"
+                  >
+                    <Zap className="h-4 w-4" /> Book now on ReserveCalifornia
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                  <ShareButton
+                    url={url}
+                    title={`${watch.facilityName} — ${watch.parkName}`}
+                    text={`${watch.availableCount} site${watch.availableCount > 1 ? 's' : ''} open at ${watch.facilityName}, ${watch.parkName}`}
+                  />
+                </div>
               </div>
             )}
 
