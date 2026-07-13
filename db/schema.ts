@@ -85,8 +85,18 @@ export const watches = pgTable("watches", {
   // Paused watches are skipped by the poller.
   active: boolean().notNull().default(true),
   // How often the poller should re-check this watch, in minutes (floor of 5,
-  // matching the Worker's own */5 cron cadence — see wrangler.toml).
+  // matching the Worker's own */5 cron cadence — see wrangler.toml). Only
+  // used when scheduleMode is "interval".
   checkFrequencyMinutes: integer("check_frequency_minutes").notNull().default(5),
+  // "interval" checks every checkFrequencyMinutes since the last check;
+  // "daily" checks once per day at dailyCheckTime instead.
+  scheduleMode: text("schedule_mode").notNull().default("interval"),
+  // Time of day (UTC, "HH:MM" 24-hour) the daily check should run. Only set
+  // when scheduleMode is "daily".
+  dailyCheckTime: text("daily_check_time"),
+  // UTC date ("YYYY-MM-DD") the daily check last ran, so a watch isn't
+  // rechecked again until the next day even though the cron polls every 5 min.
+  lastDailyCheckDate: text("last_daily_check_date"),
   // Poller bookkeeping.
   lastCheckedAt: timestamp("last_checked_at"),
   lastResult: text("last_result").notNull().default("pending"),

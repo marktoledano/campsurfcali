@@ -41,6 +41,11 @@ async function pollDateRanges(watch: Watch): Promise<AvailableUnit[]> {
  */
 export async function pollWatch(watch: Watch): Promise<PollSummary> {
   const url = bookingUrl(watch.placeId, watch.facilityId);
+  const now = new Date();
+  // For a "daily" watch, a poll (successful or not) satisfies that day's check
+  // so the cron's 5-minute sweeps don't re-trigger it again until tomorrow.
+  const dailyBookkeeping =
+    watch.scheduleMode === "daily" ? { lastDailyCheckDate: todayUTC(now) } : {};
   try {
     const available = await pollDateRanges(watch);
 
@@ -56,8 +61,9 @@ export async function pollWatch(watch: Watch): Promise<PollSummary> {
       .set({
         currentAvailability: available,
         availableCount: available.length,
-        lastCheckedAt: new Date(),
+        lastCheckedAt: now,
         lastResult: available.length > 0 ? "available" : "unavailable",
+        ...dailyBookkeeping,
       })
       .where(eq(watches.id, watch.id));
 
@@ -87,7 +93,7 @@ export async function pollWatch(watch: Watch): Promise<PollSummary> {
     console.error(`Failed to poll watch ${watch.id}:`, err);
     await db
       .update(watches)
-      .set({ lastCheckedAt: new Date(), lastResult: "error" })
+      .set({ lastCheckedAt: now, lastResult: "error", ...dailyBookkeeping })
       .where(eq(watches.id, watch.id));
     return {
       watchId: watch.id,
@@ -98,17 +104,32 @@ export async function pollWatch(watch: Watch): Promise<PollSummary> {
   }
 }
 
-/** A watch is due once its own check-frequency interval has elapsed since the last poll. */
-function isDue(watch: Watch, now: number): boolean {
+function todayUTC(now: Date): string {
+  return now.toISOString().slice(0, 10);
+}
+
+/**
+ * A watch is due once its own schedule says so: either its check-frequency
+ * interval has elapsed since the last poll ("interval" mode), or today's
+ * scheduled clock time (UTC) has arrived and hasn't been checked yet ("daily").
+ */
+function isDue(watch: Watch, now: Date): boolean {
+  if (watch.scheduleMode === "daily") {
+    if (!watch.dailyCheckTime) return true; // misconfigured; fail open
+    const today = todayUTC(now);
+    if (watch.lastDailyCheckDate === today) return false;
+    const scheduled = new Date(`${today}T${watch.dailyCheckTime}:00Z`);
+    return now.getTime() >= scheduled.getTime();
+  }
   if (!watch.lastCheckedAt) return true;
   const dueAt = watch.lastCheckedAt.getTime() + watch.checkFrequencyMinutes * 60_000;
-  return dueAt <= now;
+  return dueAt <= now.getTime();
 }
 
 /** Poll every active, due watch, spacing requests out to stay a polite client. */
 export async function pollAllWatches(): Promise<PollSummary[]> {
   const active = await db.select().from(watches).where(eq(watches.active, true));
-  const now = Date.now();
+  const now = new Date();
   const due = active.filter((w) => isDue(w, now));
   const summaries: PollSummary[] = [];
   for (const watch of due) {

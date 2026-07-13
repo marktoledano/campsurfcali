@@ -5,6 +5,7 @@ import { watches, type DateRange } from "../../../db/schema.js";
 import { getSessionUser } from "../../../lib/auth.js";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const MIN_CHECK_FREQUENCY_MINUTES = 5;
 
 /**
@@ -39,7 +40,32 @@ export const Route = createFileRoute("/api/watches/$id")({
             ? String(body.siteFilter).trim()
             : null;
 
-        if (typeof body.checkFrequencyMinutes !== "undefined") {
+        if (typeof body.scheduleMode !== "undefined") {
+          if (body.scheduleMode === "daily") {
+            const time = String(body.dailyCheckTime ?? "");
+            if (!TIME_RE.test(time))
+              return Response.json(
+                { error: "dailyCheckTime must be a 24-hour HH:MM time" },
+                { status: 400 },
+              );
+            patch.scheduleMode = "daily";
+            patch.dailyCheckTime = time;
+            patch.lastDailyCheckDate = null;
+          } else if (body.scheduleMode === "interval") {
+            const n = Number(body.checkFrequencyMinutes);
+            if (!Number.isFinite(n) || n < MIN_CHECK_FREQUENCY_MINUTES)
+              return Response.json(
+                { error: `checkFrequencyMinutes must be at least ${MIN_CHECK_FREQUENCY_MINUTES}` },
+                { status: 400 },
+              );
+            patch.scheduleMode = "interval";
+            patch.checkFrequencyMinutes = Math.floor(n);
+            patch.dailyCheckTime = null;
+            patch.lastDailyCheckDate = null;
+          } else {
+            return Response.json({ error: "scheduleMode must be 'interval' or 'daily'" }, { status: 400 });
+          }
+        } else if (typeof body.checkFrequencyMinutes !== "undefined") {
           const n = Number(body.checkFrequencyMinutes);
           if (!Number.isFinite(n) || n < MIN_CHECK_FREQUENCY_MINUTES)
             return Response.json(

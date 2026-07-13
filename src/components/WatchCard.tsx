@@ -25,10 +25,12 @@ import {
 import {
   api,
   formatDateRange,
-  formatFrequency,
+  formatSchedule,
   frequencyToMinutes,
+  localTimeToUtcHHMM,
   minutesToFrequency,
   nightsBetween,
+  utcHHMMToLocalTime,
   type DateRange,
   type FrequencyUnit,
   type Watch,
@@ -81,6 +83,10 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
   const initialFreq = minutesToFrequency(watch.checkFrequencyMinutes)
   const [freqValue, setFreqValue] = useState(initialFreq.value)
   const [freqUnit, setFreqUnit] = useState<FrequencyUnit>(initialFreq.unit)
+  const [scheduleMode, setScheduleMode] = useState(watch.scheduleMode)
+  const [dailyLocalTime, setDailyLocalTime] = useState(
+    watch.dailyCheckTime ? utcHHMMToLocalTime(watch.dailyCheckTime) : '08:00',
+  )
 
   const [cloning, setCloning] = useState(false)
   const [cloneSaving, setCloneSaving] = useState(false)
@@ -128,6 +134,8 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
     const freq = minutesToFrequency(watch.checkFrequencyMinutes)
     setFreqValue(freq.value)
     setFreqUnit(freq.unit)
+    setScheduleMode(watch.scheduleMode)
+    setDailyLocalTime(watch.dailyCheckTime ? utcHHMMToLocalTime(watch.dailyCheckTime) : '08:00')
     setEditError(null)
     setCloning(false)
     setEditing(true)
@@ -168,7 +176,10 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
           minNights: Math.min(minNights, maxWindow),
           siteFilter: siteFilter.trim() || null,
           adaOnly,
-          checkFrequencyMinutes: frequencyToMinutes(freqValue, freqUnit),
+          scheduleMode,
+          ...(scheduleMode === 'daily'
+            ? { dailyCheckTime: localTimeToUtcHHMM(dailyLocalTime) }
+            : { checkFrequencyMinutes: frequencyToMinutes(freqValue, freqUnit) }),
         }),
       )
       setEditing(false)
@@ -198,7 +209,9 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
         siteFilter: watch.siteFilter,
         adaOnly: watch.adaOnly,
         autoBook: watch.autoBook,
+        scheduleMode: watch.scheduleMode,
         checkFrequencyMinutes: watch.checkFrequencyMinutes,
+        ...(watch.dailyCheckTime ? { dailyCheckTime: watch.dailyCheckTime } : {}),
       })
       onCloned(created)
       setCloning(false)
@@ -380,29 +393,58 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
                   </label>
                 </div>
 
-                <label className="block text-xs">
+                <div className="text-xs">
                   <span className="mb-1 flex items-center gap-1.5 font-semibold text-pine-soft">
                     <Clock3 className="h-3.5 w-3.5" /> Check frequency
                   </span>
-                  <div className="flex gap-2">
+                  <div className="mb-2 flex rounded-lg border border-pine/15 bg-white p-0.5 text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => setScheduleMode('interval')}
+                      className={`flex-1 rounded-md px-2.5 py-1.5 transition ${
+                        scheduleMode === 'interval' ? 'bg-ocean text-paper' : 'text-pine-soft hover:text-pine'
+                      }`}
+                    >
+                      Interval
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setScheduleMode('daily')}
+                      className={`flex-1 rounded-md px-2.5 py-1.5 transition ${
+                        scheduleMode === 'daily' ? 'bg-ocean text-paper' : 'text-pine-soft hover:text-pine'
+                      }`}
+                    >
+                      Daily at a time
+                    </button>
+                  </div>
+                  {scheduleMode === 'interval' ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        value={freqValue}
+                        onChange={(e) => setFreqValue(Math.max(1, Number(e.target.value)))}
+                        className="w-full rounded-lg border border-pine/15 bg-white px-3 py-2 text-sm text-pine outline-none focus:border-ocean"
+                      />
+                      <select
+                        value={freqUnit}
+                        onChange={(e) => setFreqUnit(e.target.value as FrequencyUnit)}
+                        className="rounded-lg border border-pine/15 bg-white px-3 py-2 text-sm text-pine outline-none focus:border-ocean"
+                      >
+                        <option value="minutes">minutes</option>
+                        <option value="hours">hours</option>
+                        <option value="days">days</option>
+                      </select>
+                    </div>
+                  ) : (
                     <input
-                      type="number"
-                      min={1}
-                      value={freqValue}
-                      onChange={(e) => setFreqValue(Math.max(1, Number(e.target.value)))}
+                      type="time"
+                      value={dailyLocalTime}
+                      onChange={(e) => setDailyLocalTime(e.target.value)}
                       className="w-full rounded-lg border border-pine/15 bg-white px-3 py-2 text-sm text-pine outline-none focus:border-ocean"
                     />
-                    <select
-                      value={freqUnit}
-                      onChange={(e) => setFreqUnit(e.target.value as FrequencyUnit)}
-                      className="rounded-lg border border-pine/15 bg-white px-3 py-2 text-sm text-pine outline-none focus:border-ocean"
-                    >
-                      <option value="minutes">minutes</option>
-                      <option value="hours">hours</option>
-                      <option value="days">days</option>
-                    </select>
-                  </div>
-                </label>
+                  )}
+                </div>
 
                 <button
                   onClick={() => setAdaOnly((v) => !v)}
@@ -467,7 +509,7 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
                 )}
                 <span className="text-pine/30">•</span>
                 <span className="flex items-center gap-1">
-                  <Clock3 className="h-3.5 w-3.5" /> {formatFrequency(watch.checkFrequencyMinutes)}
+                  <Clock3 className="h-3.5 w-3.5" /> {formatSchedule(watch)}
                 </span>
               </div>
             )}

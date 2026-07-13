@@ -25,6 +25,8 @@ export type Watch = {
   autoBook: boolean
   active: boolean
   checkFrequencyMinutes: number
+  scheduleMode: 'interval' | 'daily'
+  dailyCheckTime: string | null
   lastCheckedAt: string | null
   lastResult: string
   availableCount: number
@@ -77,7 +79,9 @@ export type NewWatchInput = {
   siteFilter: string | null
   adaOnly: boolean
   autoBook: boolean
+  scheduleMode?: 'interval' | 'daily'
   checkFrequencyMinutes?: number
+  dailyCheckTime?: string
 }
 
 async function json<T>(resOrPromise: Response | Promise<Response>): Promise<T> {
@@ -121,7 +125,9 @@ export const api = {
       siteFilter?: string | null
       minNights?: number
       dateRanges?: DateRange[]
+      scheduleMode?: 'interval' | 'daily'
       checkFrequencyMinutes?: number
+      dailyCheckTime?: string
     },
   ) =>
     json<{ watch: Watch }>(
@@ -137,12 +143,16 @@ export const api = {
       if (!res.ok && res.status !== 204) throw new Error('Failed to delete')
     }),
 
-  setFrequencyForAll: (checkFrequencyMinutes: number) =>
+  setScheduleForAll: (
+    schedule:
+      | { scheduleMode: 'interval'; checkFrequencyMinutes: number }
+      | { scheduleMode: 'daily'; dailyCheckTime: string },
+  ) =>
     json<{ watches: Watch[] }>(
       fetch('/api/watches', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ checkFrequencyMinutes }),
+        body: JSON.stringify(schedule),
       }),
     ).then((r) => r.watches),
 
@@ -236,4 +246,38 @@ export function formatFrequency(minutes: number): string {
   const { value, unit } = minutesToFrequency(minutes)
   const label = unit === 'minutes' ? 'min' : unit === 'hours' ? 'hr' : value === 1 ? 'day' : 'days'
   return `every ${value} ${label}`
+}
+
+/** Convert a local "HH:MM" (from an <input type="time">) to UTC "HH:MM" for storage. */
+export function localTimeToUtcHHMM(localHHMM: string): string {
+  const [h, m] = localHHMM.split(':').map(Number)
+  const d = new Date()
+  d.setHours(h, m, 0, 0)
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+}
+
+/** Convert a stored UTC "HH:MM" to local "HH:MM" for an <input type="time"> value. */
+export function utcHHMMToLocalTime(utcHHMM: string): string {
+  const [h, m] = utcHHMM.split(':').map(Number)
+  const d = new Date()
+  d.setUTCHours(h, m, 0, 0)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+/** Human-readable local time for display, e.g. "8:00 AM", from a stored UTC "HH:MM". */
+export function formatDailyTime(utcHHMM: string): string {
+  const [h, m] = utcHHMM.split(':').map(Number)
+  const d = new Date()
+  d.setUTCHours(h, m, 0, 0)
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
+
+/** Compact schedule display, e.g. "daily at 8:00 AM" or "every 15 min". */
+export function formatSchedule(
+  watch: Pick<Watch, 'scheduleMode' | 'checkFrequencyMinutes' | 'dailyCheckTime'>,
+): string {
+  if (watch.scheduleMode === 'daily' && watch.dailyCheckTime) {
+    return `daily at ${formatDailyTime(watch.dailyCheckTime)}`
+  }
+  return formatFrequency(watch.checkFrequencyMinutes)
 }

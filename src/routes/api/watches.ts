@@ -5,11 +5,12 @@ import { watches, type NewWatch, type DateRange } from "../../../db/schema.js";
 import { getSessionUser } from "../../../lib/auth.js";
 
 const MIN_CHECK_FREQUENCY_MINUTES = 5;
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /**
  *   GET   /api/watches           -> the logged-in user's watches (newest first)
  *   POST  /api/watches           -> create a watch for the logged-in user
- *   PATCH /api/watches           { checkFrequencyMinutes } -> bulk-apply to every one of the user's watches
+ *   PATCH /api/watches           { scheduleMode, checkFrequencyMinutes | dailyCheckTime } -> bulk-apply to every one of the user's watches
  */
 export const Route = createFileRoute("/api/watches")({
   server: {
@@ -42,6 +43,11 @@ export const Route = createFileRoute("/api/watches")({
           return Response.json({ error: errors.join("; ") }, { status: 400 });
         }
 
+        const schedule = parseSchedule(body);
+        if ("error" in schedule) {
+          return Response.json({ error: schedule.error }, { status: 400 });
+        }
+
         const values: NewWatch = {
           userId: user.id,
           email: user.email,
@@ -57,7 +63,7 @@ export const Route = createFileRoute("/api/watches")({
           siteFilter: body.siteFilter ? String(body.siteFilter).trim() : null,
           adaOnly: Boolean(body.adaOnly),
           autoBook: Boolean(body.autoBook),
-          checkFrequencyMinutes: clampFrequency(body.checkFrequencyMinutes),
+          ...schedule,
         };
 
         const [created] = await db.insert(watches).values(values).returning();
@@ -69,17 +75,14 @@ export const Route = createFileRoute("/api/watches")({
         if (!user) return Response.json({ error: "unauthorized" }, { status: 401 });
 
         const body: any = await request.json().catch(() => ({}));
-        const minutes = Number(body.checkFrequencyMinutes);
-        if (!Number.isFinite(minutes) || minutes < MIN_CHECK_FREQUENCY_MINUTES) {
-          return Response.json(
-            { error: `checkFrequencyMinutes must be at least ${MIN_CHECK_FREQUENCY_MINUTES}` },
-            { status: 400 },
-          );
+        const schedule = parseSchedule(body);
+        if ("error" in schedule) {
+          return Response.json({ error: schedule.error }, { status: 400 });
         }
 
         await db
           .update(watches)
-          .set({ checkFrequencyMinutes: Math.floor(minutes) })
+          .set({ ...schedule, lastDailyCheckDate: null })
           .where(eq(watches.userId, user.id));
 
         const rows = await db
@@ -97,6 +100,27 @@ function clampFrequency(value: unknown): number {
   const n = Number(value);
   if (!Number.isFinite(n)) return MIN_CHECK_FREQUENCY_MINUTES;
   return Math.max(MIN_CHECK_FREQUENCY_MINUTES, Math.floor(n));
+}
+
+/** Shared parse/validate for the interval-vs-daily schedule fields (create + bulk PATCH). */
+function parseSchedule(
+  body: any,
+):
+  | { scheduleMode: "interval"; checkFrequencyMinutes: number; dailyCheckTime: null }
+  | { scheduleMode: "daily"; checkFrequencyMinutes: number; dailyCheckTime: string }
+  | { error: string } {
+  if (body.scheduleMode === "daily") {
+    const time = String(body.dailyCheckTime ?? "");
+    if (!TIME_RE.test(time)) {
+      return { error: "dailyCheckTime must be a 24-hour HH:MM time" };
+    }
+    return { scheduleMode: "daily", checkFrequencyMinutes: MIN_CHECK_FREQUENCY_MINUTES, dailyCheckTime: time };
+  }
+  return {
+    scheduleMode: "interval",
+    checkFrequencyMinutes: clampFrequency(body.checkFrequencyMinutes),
+    dailyCheckTime: null,
+  };
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
