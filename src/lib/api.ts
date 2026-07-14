@@ -18,6 +18,7 @@ export type Watch = {
   facilityName: string
   placeId: number
   facilityId: number
+  parkUrl: string | null
   dateRanges: DateRange[]
   minNights: number
   siteFilter: string | null
@@ -78,6 +79,7 @@ export type NewWatchInput = {
   facilityName: string
   placeId: number
   facilityId: number
+  parkUrl?: string | null
   dateRanges: DateRange[]
   minNights: number
   siteFilter: string | null
@@ -104,9 +106,9 @@ export const api = {
     ).then((r) => r.parks),
 
   getFacilities: (placeId: number, start: string) =>
-    json<{ facilities: FacilityResult[] }>(
+    json<{ facilities: FacilityResult[]; parkUrl: string | null }>(
       fetch(`/api/search?placeId=${placeId}&start=${start}`),
-    ).then((r) => r.facilities),
+    ),
 
   listWatches: () =>
     json<{ watches: Watch[] }>(fetch('/api/watches')).then((r) => r.watches),

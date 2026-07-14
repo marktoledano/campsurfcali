@@ -55,6 +55,7 @@ export const Route = createFileRoute("/api/watches")({
           facilityName: String(body.facilityName),
           placeId: Number(body.placeId),
           facilityId: Number(body.facilityId),
+          parkUrl: body.parkUrl ? String(body.parkUrl) : null,
           dateRanges: (body.dateRanges as any[]).map((r) => ({
             startDate: String(r.startDate),
             endDate: String(r.endDate),

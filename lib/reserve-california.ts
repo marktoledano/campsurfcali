@@ -76,23 +76,38 @@ export type FacilityResult = {
   allowWebBooking: boolean;
 };
 
-/** List the campgrounds (facilities) inside a park. */
+export type PlaceFacilities = {
+  facilities: FacilityResult[];
+  /**
+   * The park's official info page (usually parks.ca.gov), when the API
+   * provides one. ReserveCalifornia doesn't expose a per-campsite map, but
+   * these park pages commonly link to a downloadable park/trail map — the
+   * closest real "map" reference available. Null when absent.
+   */
+  parkUrl: string | null;
+};
+
+/** List the campgrounds (facilities) inside a park, plus the park's official page. */
 export async function getFacilities(
   placeId: number,
   startDate: string,
-): Promise<FacilityResult[]> {
+): Promise<PlaceFacilities> {
   const res = await rdrFetch(`/search/place`, {
     method: "POST",
     headers: REQUEST_HEADERS,
     body: JSON.stringify({ PlaceId: placeId, StartDate: toApiDate(startDate) }),
   });
   const data = (await res.json()) as any;
-  const facilities = data?.SelectedPlace?.Facilities ?? {};
-  return Object.values<any>(facilities).map((f) => ({
-    facilityId: Number(f.FacilityId),
-    name: String(f.Name ?? "Unknown campground"),
-    allowWebBooking: Boolean(f.AllowWebBooking ?? true),
-  }));
+  const selectedPlace = data?.SelectedPlace ?? {};
+  const facilities = selectedPlace.Facilities ?? {};
+  return {
+    facilities: Object.values<any>(facilities).map((f) => ({
+      facilityId: Number(f.FacilityId),
+      name: String(f.Name ?? "Unknown campground"),
+      allowWebBooking: Boolean(f.AllowWebBooking ?? true),
+    })),
+    parkUrl: selectedPlace.Url ? String(selectedPlace.Url) : null,
+  };
 }
 
 export type GridUnit = {

@@ -16,11 +16,11 @@ export const Route = createFileRoute("/api/search")({
 
         try {
           if (placeId) {
-            const facilities = await getFacilities(
+            const { facilities, parkUrl } = await getFacilities(
               Number(placeId),
               start || defaultStartDate(),
             );
-            return Response.json({ facilities });
+            return Response.json({ facilities, parkUrl });
           }
 
           const park = url.searchParams.get("park")?.trim();

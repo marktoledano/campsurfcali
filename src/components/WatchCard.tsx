@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import {
   Tent,
   MapPin,
+  Map,
   RefreshCw,
   Trash2,
   Pause,
@@ -204,6 +205,7 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
         facilityName: facility.name,
         placeId: park.placeId,
         facilityId: facility.facilityId,
+        parkUrl: clonePicker.parkUrl,
         dateRanges: watch.dateRanges,
         minNights: watch.minNights,
         siteFilter: watch.siteFilter,
@@ -511,6 +513,19 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
                 <span className="flex items-center gap-1">
                   <Clock3 className="h-3.5 w-3.5" /> {formatSchedule(watch)}
                 </span>
+                {watch.parkUrl && (
+                  <>
+                    <span className="text-pine/30">•</span>
+                    <a
+                      href={watch.parkUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1 font-semibold text-ocean-deep hover:underline"
+                    >
+                      <Map className="h-3.5 w-3.5" /> Park info & maps
+                    </a>
+                  </>
+                )}
               </div>
             )}
 

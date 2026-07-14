@@ -14,6 +14,7 @@ export function useSitePicker(referenceStartDate: string) {
   const [facilities, setFacilities] = useState<FacilityResult[]>([])
   const [loadingFacilities, setLoadingFacilities] = useState(false)
   const [facility, setFacility] = useState<FacilityResult | null>(null)
+  const [parkUrl, setParkUrl] = useState<string | null>(null)
 
   const [error, setError] = useState<string | null>(null)
   const debounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -46,8 +47,9 @@ export function useSitePicker(referenceStartDate: string) {
     setLoadingFacilities(true)
     setError(null)
     try {
-      const list = await api.getFacilities(p.placeId, referenceStartDate)
+      const { facilities: list, parkUrl: url } = await api.getFacilities(p.placeId, referenceStartDate)
       setFacilities(list)
+      setParkUrl(url)
       if (list.length === 0)
         setError('No campgrounds found for this park right now.')
     } catch (e) {
@@ -61,6 +63,7 @@ export function useSitePicker(referenceStartDate: string) {
     setPark(null)
     setFacility(null)
     setFacilities([])
+    setParkUrl(null)
     setQuery('')
     setError(null)
   }
@@ -75,6 +78,7 @@ export function useSitePicker(referenceStartDate: string) {
     loadingFacilities,
     facility,
     setFacility,
+    parkUrl,
     pickPark,
     reset,
     error,

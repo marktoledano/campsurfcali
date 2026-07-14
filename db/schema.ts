@@ -85,6 +85,10 @@ export const watches = pgTable("watches", {
   facilityName: text("facility_name").notNull(),
   placeId: integer("place_id").notNull(),
   facilityId: integer("facility_id").notNull(),
+  // The park's official info page (usually parks.ca.gov), when available.
+  // ReserveCalifornia doesn't expose a per-campsite map; this is the closest
+  // real "map" reference — null when the API didn't provide one.
+  parkUrl: text("park_url"),
   // Desired stay windows. A watch can track several separate date ranges at
   // the same campground (e.g. two different weekends); the poller checks
   // each one independently and merges the results.

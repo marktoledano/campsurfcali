@@ -82,6 +82,7 @@ export function AddWatchForm({ onCreated }: Props) {
       facilityName: facility.name,
       placeId: park.placeId,
       facilityId: facility.facilityId,
+      parkUrl: picker.parkUrl,
       dateRanges: ranges,
       minNights: Math.min(minNights, maxWindow),
       siteFilter: siteFilter.trim() || null,
