@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { sessions, users, type User } from "../db/schema.js";
+import { sessions, users, watches, type User } from "../db/schema.js";
 
 const PBKDF2_ITERATIONS = 100_000;
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -111,6 +111,18 @@ export async function getSessionUser(request: Request): Promise<User | null> {
     return null;
   }
   return row.user;
+}
+
+/**
+ * Update an account's email and cascade it onto every one of that user's
+ * watches (denormalized there for notify.ts / lib/reports.ts) so alerts keep
+ * going to the current address instead of the one on file when each tracker
+ * was created.
+ */
+export async function updateUserEmail(userId: number, email: string): Promise<User> {
+  const [updated] = await db.update(users).set({ email }).where(eq(users.id, userId)).returning();
+  await db.update(watches).set({ email }).where(eq(watches.userId, userId));
+  return updated;
 }
 
 /** Strip the password hash before a user row ever reaches a JSON response. */

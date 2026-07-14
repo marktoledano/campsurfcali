@@ -24,10 +24,18 @@ type Props = {
   onCreated: () => void
 }
 
-function tomorrow(): string {
+/**
+ * Today's date (YYYY-MM-DD) in the browser's local timezone. Never derive
+ * this via `.toISOString()` on a local Date — that serializes to UTC, which
+ * during Pacific evenings (UTC already past midnight) silently reports
+ * tomorrow's date instead of today's.
+ */
+function today(): string {
   const d = new Date()
-  d.setDate(d.getDate() + 1)
-  return d.toISOString().slice(0, 10)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 function plusDays(from: string, n: number): string {
   const d = new Date(from + 'T00:00:00Z')
@@ -35,7 +43,7 @@ function plusDays(from: string, n: number): string {
   return d.toISOString().slice(0, 10)
 }
 function defaultRange(): DateRange {
-  return { startDate: tomorrow(), endDate: plusDays(tomorrow(), 2) }
+  return { startDate: today(), endDate: plusDays(today(), 2) }
 }
 
 export function AddWatchForm({ onCreated }: Props) {
@@ -149,7 +157,7 @@ export function AddWatchForm({ onCreated }: Props) {
                       <input
                         type="date"
                         value={range.startDate}
-                        min={tomorrow()}
+                        min={today()}
                         onChange={(e) => {
                           const patch: Partial<DateRange> = { startDate: e.target.value }
                           if (range.endDate <= e.target.value)

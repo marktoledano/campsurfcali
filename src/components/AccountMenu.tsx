@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { BellRing, Check, ChevronDown, Loader2, Send } from 'lucide-react'
+import { BellRing, Check, ChevronDown, Loader2, Mail, Send } from 'lucide-react'
 import { api, localTimeToUtcHHMM, utcHHMMToLocalTime, type AuthUser } from '../lib/api'
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 
 type Props = {
   user: AuthUser
@@ -10,6 +12,11 @@ type Props = {
 export function AccountMenu({ user, onUpdated }: Props) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+
+  const [emailInput, setEmailInput] = useState(user.email)
+  const [emailSaving, setEmailSaving] = useState(false)
+  const [emailSaved, setEmailSaved] = useState(false)
+  const [emailError, setEmailError] = useState<string | null>(null)
 
   const [notifyImmediate, setNotifyImmediate] = useState(user.notifyImmediate)
   const [notifyDailyDigest, setNotifyDailyDigest] = useState(user.notifyDailyDigest)
@@ -24,6 +31,9 @@ export function AccountMenu({ user, onUpdated }: Props) {
   const [sendResult, setSendResult] = useState<'ok' | 'error' | null>(null)
 
   function openMenu() {
+    setEmailInput(user.email)
+    setEmailError(null)
+    setEmailSaved(false)
     setNotifyImmediate(user.notifyImmediate)
     setNotifyDailyDigest(user.notifyDailyDigest)
     setNotifyDailySites(user.notifyDailySites)
@@ -49,6 +59,26 @@ export function AccountMenu({ user, onUpdated }: Props) {
       document.removeEventListener('keydown', onKey)
     }
   }, [open])
+
+  async function updateEmail() {
+    const trimmed = emailInput.trim()
+    if (!EMAIL_RE.test(trimmed)) {
+      setEmailError('Enter a valid email address.')
+      return
+    }
+    setEmailSaving(true)
+    setEmailError(null)
+    try {
+      const updated = await api.updateEmail(trimmed)
+      onUpdated(updated)
+      setEmailSaved(true)
+      setTimeout(() => setEmailSaved(false), 2000)
+    } catch (e) {
+      setEmailError((e as Error).message)
+    } finally {
+      setEmailSaving(false)
+    }
+  }
 
   async function save() {
     setSaving(true)
@@ -97,6 +127,35 @@ export function AccountMenu({ user, onUpdated }: Props) {
       {open && (
         <div className="absolute right-0 z-20 mt-2 w-80 space-y-4 rounded-2xl border border-pine/10 bg-white p-5 text-left shadow-xl">
           <div>
+            <p className="flex items-center gap-1.5 text-sm font-bold text-pine">
+              <Mail className="h-4 w-4 text-ocean" /> Account email
+            </p>
+            <p className="mt-0.5 text-xs text-pine-soft">Where alerts and reports are sent.</p>
+            <div className="mt-2 flex gap-2">
+              <input
+                type="email"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                className="w-full rounded-lg border border-pine/15 bg-sand/60 px-3 py-2 text-sm text-pine outline-none focus:border-ocean focus:bg-white"
+              />
+              <button
+                onClick={updateEmail}
+                disabled={emailSaving || emailInput.trim() === user.email}
+                className="flex shrink-0 items-center gap-1.5 rounded-lg bg-ocean px-3 py-2 text-sm font-bold text-paper shadow transition hover:bg-ocean-deep disabled:opacity-60"
+              >
+                {emailSaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : emailSaved ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  'Update'
+                )}
+              </button>
+            </div>
+            {emailError && <p className="mt-1.5 text-xs font-medium text-clay">{emailError}</p>}
+          </div>
+
+          <div className="border-t border-pine/10 pt-4">
             <p className="flex items-center gap-1.5 text-sm font-bold text-pine">
               <BellRing className="h-4 w-4 text-ocean" /> Email notifications
             </p>

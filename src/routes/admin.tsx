@@ -1,7 +1,9 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ShieldCheck, ShieldOff, Trash2, Waves } from 'lucide-react'
+import { ArrowLeft, Check, Loader2, Pencil, ShieldCheck, ShieldOff, Trash2, Waves, X } from 'lucide-react'
 import { api, type AdminUserRow, type AuthUser } from '../lib/api'
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 
 export const Route = createFileRoute('/admin')({
   component: AdminConsole,
@@ -14,6 +16,11 @@ function AdminConsole() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<number | null>(null)
+
+  const [editingEmailId, setEditingEmailId] = useState<number | null>(null)
+  const [emailDraft, setEmailDraft] = useState('')
+  const [emailSavingId, setEmailSavingId] = useState<number | null>(null)
+  const [emailError, setEmailError] = useState<string | null>(null)
 
   useEffect(() => {
     api.me().then(setMe)
@@ -57,6 +64,36 @@ function AdminConsole() {
       setError((e as Error).message)
     } finally {
       setBusyId(null)
+    }
+  }
+
+  function startEditEmail(u: AdminUserRow) {
+    setEditingEmailId(u.id)
+    setEmailDraft(u.email)
+    setEmailError(null)
+  }
+
+  function cancelEditEmail() {
+    setEditingEmailId(null)
+    setEmailError(null)
+  }
+
+  async function saveEmail(u: AdminUserRow) {
+    const trimmed = emailDraft.trim()
+    if (!EMAIL_RE.test(trimmed)) {
+      setEmailError('Enter a valid email address.')
+      return
+    }
+    setEmailSavingId(u.id)
+    setEmailError(null)
+    try {
+      const updated = await api.adminUpdateEmail(u.id, trimmed)
+      setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, email: updated.email } : x)))
+      setEditingEmailId(null)
+    } catch (e) {
+      setEmailError((e as Error).message)
+    } finally {
+      setEmailSavingId(null)
     }
   }
 
@@ -110,7 +147,50 @@ function AdminConsole() {
             {users.map((u) => (
               <tr key={u.id} className="border-b border-pine/5 last:border-0">
                 <td className="px-5 py-3 font-semibold text-pine">{u.username}</td>
-                <td className="px-5 py-3 text-pine-soft">{u.email}</td>
+                <td className="px-5 py-3 text-pine-soft">
+                  {editingEmailId === u.id ? (
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="email"
+                          value={emailDraft}
+                          onChange={(e) => setEmailDraft(e.target.value)}
+                          autoFocus
+                          className="w-48 rounded-lg border border-pine/15 bg-white px-2.5 py-1.5 text-sm text-pine outline-none focus:border-ocean"
+                        />
+                        <button
+                          onClick={() => saveEmail(u)}
+                          disabled={emailSavingId === u.id}
+                          title="Save"
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-ocean-deep transition hover:bg-ocean/10 disabled:opacity-40"
+                        >
+                          {emailSavingId === u.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Check className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                        <button
+                          onClick={cancelEditEmail}
+                          disabled={emailSavingId === u.id}
+                          title="Cancel"
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-pine-soft transition hover:bg-sand-deep/50 disabled:opacity-40"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      {emailError && <p className="mt-1 text-xs font-medium text-clay">{emailError}</p>}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => startEditEmail(u)}
+                      className="group flex items-center gap-1.5 text-left hover:text-pine"
+                    >
+                      {u.email}
+                      <Pencil className="h-3 w-3 text-pine-soft opacity-0 transition group-hover:opacity-100" />
+                    </button>
+                  )}
+                </td>
                 <td className="px-5 py-3 text-pine-soft">{u.trackerCount}</td>
                 <td className="px-5 py-3">
                   {u.isAdmin ? (

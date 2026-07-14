@@ -22,6 +22,7 @@ import { Route as ApiAuthPreferencesRouteImport } from './routes/api/auth.prefer
 import { Route as ApiAuthMeRouteImport } from './routes/api/auth.me'
 import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth.logout'
 import { Route as ApiAuthLoginRouteImport } from './routes/api/auth.login'
+import { Route as ApiAuthEmailRouteImport } from './routes/api/auth.email'
 import { Route as ApiAdminUsersRouteImport } from './routes/api/admin.users'
 import { Route as ApiAdminUsersIdRouteImport } from './routes/api/admin.users.$id'
 
@@ -90,6 +91,11 @@ const ApiAuthLoginRoute = ApiAuthLoginRouteImport.update({
   path: '/api/auth/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuthEmailRoute = ApiAuthEmailRouteImport.update({
+  id: '/api/auth/email',
+  path: '/api/auth/email',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminUsersRoute = ApiAdminUsersRouteImport.update({
   id: '/api/admin/users',
   path: '/api/admin/users',
@@ -109,6 +115,7 @@ export interface FileRoutesByFullPath {
   '/api/search': typeof ApiSearchRoute
   '/api/watches': typeof ApiWatchesRouteWithChildren
   '/api/admin/users': typeof ApiAdminUsersRouteWithChildren
+  '/api/auth/email': typeof ApiAuthEmailRoute
   '/api/auth/login': typeof ApiAuthLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/me': typeof ApiAuthMeRoute
@@ -126,6 +133,7 @@ export interface FileRoutesByTo {
   '/api/search': typeof ApiSearchRoute
   '/api/watches': typeof ApiWatchesRouteWithChildren
   '/api/admin/users': typeof ApiAdminUsersRouteWithChildren
+  '/api/auth/email': typeof ApiAuthEmailRoute
   '/api/auth/login': typeof ApiAuthLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/me': typeof ApiAuthMeRoute
@@ -144,6 +152,7 @@ export interface FileRoutesById {
   '/api/search': typeof ApiSearchRoute
   '/api/watches': typeof ApiWatchesRouteWithChildren
   '/api/admin/users': typeof ApiAdminUsersRouteWithChildren
+  '/api/auth/email': typeof ApiAuthEmailRoute
   '/api/auth/login': typeof ApiAuthLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/me': typeof ApiAuthMeRoute
@@ -163,6 +172,7 @@ export interface FileRouteTypes {
     | '/api/search'
     | '/api/watches'
     | '/api/admin/users'
+    | '/api/auth/email'
     | '/api/auth/login'
     | '/api/auth/logout'
     | '/api/auth/me'
@@ -180,6 +190,7 @@ export interface FileRouteTypes {
     | '/api/search'
     | '/api/watches'
     | '/api/admin/users'
+    | '/api/auth/email'
     | '/api/auth/login'
     | '/api/auth/logout'
     | '/api/auth/me'
@@ -197,6 +208,7 @@ export interface FileRouteTypes {
     | '/api/search'
     | '/api/watches'
     | '/api/admin/users'
+    | '/api/auth/email'
     | '/api/auth/login'
     | '/api/auth/logout'
     | '/api/auth/me'
@@ -215,6 +227,7 @@ export interface RootRouteChildren {
   ApiSearchRoute: typeof ApiSearchRoute
   ApiWatchesRoute: typeof ApiWatchesRouteWithChildren
   ApiAdminUsersRoute: typeof ApiAdminUsersRouteWithChildren
+  ApiAuthEmailRoute: typeof ApiAuthEmailRoute
   ApiAuthLoginRoute: typeof ApiAuthLoginRoute
   ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
   ApiAuthMeRoute: typeof ApiAuthMeRoute
@@ -316,6 +329,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth/email': {
+      id: '/api/auth/email'
+      path: '/api/auth/email'
+      fullPath: '/api/auth/email'
+      preLoaderRoute: typeof ApiAuthEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/users': {
       id: '/api/admin/users'
       path: '/api/admin/users'
@@ -365,6 +385,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSearchRoute: ApiSearchRoute,
   ApiWatchesRoute: ApiWatchesRouteWithChildren,
   ApiAdminUsersRoute: ApiAdminUsersRouteWithChildren,
+  ApiAuthEmailRoute: ApiAuthEmailRoute,
   ApiAuthLoginRoute: ApiAuthLoginRoute,
   ApiAuthLogoutRoute: ApiAuthLogoutRoute,
   ApiAuthMeRoute: ApiAuthMeRoute,

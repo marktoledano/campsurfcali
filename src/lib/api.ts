@@ -213,6 +213,15 @@ export const api = {
   sendAvailabilityNow: () =>
     json<{ sent: boolean }>(fetch('/api/notify/send-now', { method: 'POST' })).then((r) => r.sent),
 
+  updateEmail: (email: string) =>
+    json<{ user: AuthUser }>(
+      fetch('/api/auth/email', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      }),
+    ).then((r) => r.user),
+
   adminListUsers: () =>
     json<{ users: AdminUserRow[] }>(fetch('/api/admin/users')).then((r) => r.users),
 
@@ -222,6 +231,15 @@ export const api = {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isAdmin }),
+      }),
+    ).then((r) => r.user),
+
+  adminUpdateEmail: (id: number, email: string) =>
+    json<{ user: AuthUser }>(
+      fetch(`/api/admin/users/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
       }),
     ).then((r) => r.user),
 
