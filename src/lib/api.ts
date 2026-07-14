@@ -39,6 +39,10 @@ export type AuthUser = {
   username: string
   email: string
   isAdmin: boolean
+  notifyImmediate: boolean
+  notifyDailyDigest: boolean
+  notifyDailySites: boolean
+  dailySitesTime: string
   createdAt: string | null
 }
 
@@ -189,6 +193,23 @@ export const api = {
   logout: () => fetch('/api/auth/logout', { method: 'POST' }).then(() => {}),
 
   me: () => json<{ user: AuthUser | null }>(fetch('/api/auth/me')).then((r) => r.user),
+
+  updatePreferences: (patch: {
+    notifyImmediate?: boolean
+    notifyDailyDigest?: boolean
+    notifyDailySites?: boolean
+    dailySitesTime?: string
+  }) =>
+    json<{ user: AuthUser }>(
+      fetch('/api/auth/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      }),
+    ).then((r) => r.user),
+
+  sendAvailabilityNow: () =>
+    json<{ sent: boolean }>(fetch('/api/notify/send-now', { method: 'POST' })).then((r) => r.sent),
 
   adminListUsers: () =>
     json<{ users: AdminUserRow[] }>(fetch('/api/admin/users')).then((r) => r.users),

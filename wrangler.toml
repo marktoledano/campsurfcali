@@ -8,3 +8,6 @@ directory = "dist/client"
 
 [triggers]
 crons = ["*/5 * * * *"]
+
+[[send_email]]
+name = "EMAIL"

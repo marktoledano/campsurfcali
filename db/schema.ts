@@ -37,6 +37,21 @@ export const users = pgTable("users", {
   // PBKDF2-SHA256, formatted "pbkdf2:<iterations>:<saltHex>:<hashHex>". See lib/auth.ts.
   passwordHash: text("password_hash").notNull(),
   isAdmin: boolean("is_admin").notNull().default(false),
+  // Email alert as soon as a watch's newly-open sites are recorded (per event).
+  notifyImmediate: boolean("notify_immediate").notNull().default(true),
+  // One daily recap email of everything that newly opened in roughly the last 24h.
+  // Sent at a fixed time (see lib/reports.ts's DAILY_DIGEST_TIME_UTC) — not user-configurable.
+  notifyDailyDigest: boolean("notify_daily_digest").notNull().default(false),
+  // One daily email listing every currently-open site across all active trackers,
+  // regardless of when it opened — same content as the "send availability now" button.
+  notifyDailySites: boolean("notify_daily_sites").notNull().default(false),
+  // Time of day (UTC, "HH:MM" 24-hour) the daily sites email should send. Default
+  // is 8am US Pacific Standard Time (UTC-8).
+  dailySitesTime: text("daily_sites_time").notNull().default("16:00"),
+  // UTC date ("YYYY-MM-DD") bookkeeping so the 5-minute cron doesn't resend either
+  // daily email more than once per day — mirrors watches.lastDailyCheckDate.
+  lastDigestSentDate: text("last_digest_sent_date"),
+  lastDailySitesSentDate: text("last_daily_sites_sent_date"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

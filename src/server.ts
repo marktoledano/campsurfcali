@@ -2,6 +2,7 @@ import { createStartHandler, defaultStreamHandler } from '@tanstack/react-start/
 
 import { cfEnvStorage, type CloudflareEnv } from './server/cf-env.js'
 import { pollAllWatches } from '../lib/poll.js'
+import { sendDueDailyEmails } from '../lib/reports.js'
 
 const handler = createStartHandler(defaultStreamHandler)
 
@@ -18,6 +19,7 @@ export default {
         const summaries = await pollAllWatches()
         const opened = summaries.reduce((n, s) => n + s.newlyOpen, 0)
         console.log(`Polled ${summaries.length} watches; ${opened} newly-open site group(s).`)
+        await sendDueDailyEmails()
       }),
     )
   },

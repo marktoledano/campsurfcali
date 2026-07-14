@@ -6,6 +6,7 @@ import { WatchCard } from '../components/WatchCard'
 import { NotificationsFeed } from '../components/NotificationsFeed'
 import { FrequencyControl } from '../components/FrequencyControl'
 import { AuthGate } from '../components/AuthGate'
+import { AccountMenu } from '../components/AccountMenu'
 import { api, type AuthUser, type MatchRow, type Watch } from '../lib/api'
 
 export const Route = createFileRoute('/')({
@@ -33,7 +34,7 @@ function App() {
   return (
     <div className="relative z-10 min-h-screen">
       {user ? (
-        <Dashboard user={user} onSignOut={signOut} />
+        <Dashboard user={user} onSignOut={signOut} onUserUpdated={setUser} />
       ) : (
         <AuthGate onAuthenticated={setUser} />
       )}
@@ -47,9 +48,11 @@ function App() {
 function Dashboard({
   user,
   onSignOut,
+  onUserUpdated,
 }: {
   user: AuthUser
   onSignOut: () => void
+  onUserUpdated: (user: AuthUser) => void
 }) {
   const [watches, setWatches] = useState<Watch[]>([])
   const [matches, setMatches] = useState<MatchRow[]>([])
@@ -85,7 +88,7 @@ function Dashboard({
           </span>
         </div>
         <div className="flex items-center gap-3 text-sm text-pine-soft">
-          <span className="hidden sm:inline">{user.email}</span>
+          <AccountMenu user={user} onUpdated={onUserUpdated} />
           {user.isAdmin && (
             <Link
               to="/admin"

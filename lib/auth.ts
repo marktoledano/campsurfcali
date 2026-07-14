@@ -120,6 +120,10 @@ export function toPublicUser(u: User) {
     username: u.username,
     email: u.email,
     isAdmin: u.isAdmin,
+    notifyImmediate: u.notifyImmediate,
+    notifyDailyDigest: u.notifyDailyDigest,
+    notifyDailySites: u.notifyDailySites,
+    dailySitesTime: u.dailySitesTime,
     createdAt: u.createdAt,
   };
 }

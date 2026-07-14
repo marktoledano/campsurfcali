@@ -16,7 +16,9 @@ import { Route as ApiSearchRouteImport } from './routes/api/search'
 import { Route as ApiPollRouteImport } from './routes/api/poll'
 import { Route as ApiMatchesRouteImport } from './routes/api/matches'
 import { Route as ApiWatchesIdRouteImport } from './routes/api/watches.$id'
+import { Route as ApiNotifySendNowRouteImport } from './routes/api/notify.send-now'
 import { Route as ApiAuthRegisterRouteImport } from './routes/api/auth.register'
+import { Route as ApiAuthPreferencesRouteImport } from './routes/api/auth.preferences'
 import { Route as ApiAuthMeRouteImport } from './routes/api/auth.me'
 import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth.logout'
 import { Route as ApiAuthLoginRouteImport } from './routes/api/auth.login'
@@ -58,9 +60,19 @@ const ApiWatchesIdRoute = ApiWatchesIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => ApiWatchesRoute,
 } as any)
+const ApiNotifySendNowRoute = ApiNotifySendNowRouteImport.update({
+  id: '/api/notify/send-now',
+  path: '/api/notify/send-now',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthRegisterRoute = ApiAuthRegisterRouteImport.update({
   id: '/api/auth/register',
   path: '/api/auth/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthPreferencesRoute = ApiAuthPreferencesRouteImport.update({
+  id: '/api/auth/preferences',
+  path: '/api/auth/preferences',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAuthMeRoute = ApiAuthMeRouteImport.update({
@@ -100,7 +112,9 @@ export interface FileRoutesByFullPath {
   '/api/auth/login': typeof ApiAuthLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/me': typeof ApiAuthMeRoute
+  '/api/auth/preferences': typeof ApiAuthPreferencesRoute
   '/api/auth/register': typeof ApiAuthRegisterRoute
+  '/api/notify/send-now': typeof ApiNotifySendNowRoute
   '/api/watches/$id': typeof ApiWatchesIdRoute
   '/api/admin/users/$id': typeof ApiAdminUsersIdRoute
 }
@@ -115,7 +129,9 @@ export interface FileRoutesByTo {
   '/api/auth/login': typeof ApiAuthLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/me': typeof ApiAuthMeRoute
+  '/api/auth/preferences': typeof ApiAuthPreferencesRoute
   '/api/auth/register': typeof ApiAuthRegisterRoute
+  '/api/notify/send-now': typeof ApiNotifySendNowRoute
   '/api/watches/$id': typeof ApiWatchesIdRoute
   '/api/admin/users/$id': typeof ApiAdminUsersIdRoute
 }
@@ -131,7 +147,9 @@ export interface FileRoutesById {
   '/api/auth/login': typeof ApiAuthLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/auth/me': typeof ApiAuthMeRoute
+  '/api/auth/preferences': typeof ApiAuthPreferencesRoute
   '/api/auth/register': typeof ApiAuthRegisterRoute
+  '/api/notify/send-now': typeof ApiNotifySendNowRoute
   '/api/watches/$id': typeof ApiWatchesIdRoute
   '/api/admin/users/$id': typeof ApiAdminUsersIdRoute
 }
@@ -148,7 +166,9 @@ export interface FileRouteTypes {
     | '/api/auth/login'
     | '/api/auth/logout'
     | '/api/auth/me'
+    | '/api/auth/preferences'
     | '/api/auth/register'
+    | '/api/notify/send-now'
     | '/api/watches/$id'
     | '/api/admin/users/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -163,7 +183,9 @@ export interface FileRouteTypes {
     | '/api/auth/login'
     | '/api/auth/logout'
     | '/api/auth/me'
+    | '/api/auth/preferences'
     | '/api/auth/register'
+    | '/api/notify/send-now'
     | '/api/watches/$id'
     | '/api/admin/users/$id'
   id:
@@ -178,7 +200,9 @@ export interface FileRouteTypes {
     | '/api/auth/login'
     | '/api/auth/logout'
     | '/api/auth/me'
+    | '/api/auth/preferences'
     | '/api/auth/register'
+    | '/api/notify/send-now'
     | '/api/watches/$id'
     | '/api/admin/users/$id'
   fileRoutesById: FileRoutesById
@@ -194,7 +218,9 @@ export interface RootRouteChildren {
   ApiAuthLoginRoute: typeof ApiAuthLoginRoute
   ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
   ApiAuthMeRoute: typeof ApiAuthMeRoute
+  ApiAuthPreferencesRoute: typeof ApiAuthPreferencesRoute
   ApiAuthRegisterRoute: typeof ApiAuthRegisterRoute
+  ApiNotifySendNowRoute: typeof ApiNotifySendNowRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -248,11 +274,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWatchesIdRouteImport
       parentRoute: typeof ApiWatchesRoute
     }
+    '/api/notify/send-now': {
+      id: '/api/notify/send-now'
+      path: '/api/notify/send-now'
+      fullPath: '/api/notify/send-now'
+      preLoaderRoute: typeof ApiNotifySendNowRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/register': {
       id: '/api/auth/register'
       path: '/api/auth/register'
       fullPath: '/api/auth/register'
       preLoaderRoute: typeof ApiAuthRegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/preferences': {
+      id: '/api/auth/preferences'
+      path: '/api/auth/preferences'
+      fullPath: '/api/auth/preferences'
+      preLoaderRoute: typeof ApiAuthPreferencesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/auth/me': {
@@ -328,7 +368,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthLoginRoute: ApiAuthLoginRoute,
   ApiAuthLogoutRoute: ApiAuthLogoutRoute,
   ApiAuthMeRoute: ApiAuthMeRoute,
+  ApiAuthPreferencesRoute: ApiAuthPreferencesRoute,
   ApiAuthRegisterRoute: ApiAuthRegisterRoute,
+  ApiNotifySendNowRoute: ApiNotifySendNowRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -16,12 +16,15 @@ the campgrounds and dates you care about and notifies you when something opens.
   needed.
 - **Polls automatically every 5 minutes** via a Cloudflare Worker cron trigger,
   and on demand with a "check now" button.
-- **Alerts you** in an in-app feed and (optionally) by email, each alert carrying a
-  direct deep link to the campground's checkout page on reservecalifornia.com.
+- **Alerts you** in an in-app feed and by email — choose immediate alerts, a
+  daily digest, a daily "everything that's open" report at a time you set, or
+  any combination — each alert carrying a direct deep link to the campground's
+  checkout page on reservecalifornia.com.
 - **Quick-book flag** highlights time-sensitive watches so you can grab a
   cancellation before it's gone.
 
-Watches are keyed to an email address — no account or password required.
+Trackers belong to a user account (username + password). An admin console lets
+admins view every account and its tracker count.
 
 ## Tech stack
 
@@ -30,13 +33,13 @@ Watches are keyed to an email address — no account or password required.
 - **Cloudflare Workers** — hosting, SSR, and a cron-triggered scheduled poller (`src/server.ts`)
 - **Neon Postgres** with **Drizzle ORM** — persistence
 - **ReserveCalifornia RDR API** — public availability data source
-- **[Resend](https://resend.com)** — optional email delivery
+- **Cloudflare Email Sending** — email delivery, sent from `campsurfcali.com`
 
 ## Running locally
 
 ```bash
 npm install
-cp .dev.vars.example .dev.vars  # fill in DATABASE_URL (and Resend vars if using email)
+cp .dev.vars.example .dev.vars  # fill in DATABASE_URL
 npm run dev
 ```
 
@@ -45,16 +48,19 @@ Then open the printed local URL. Apply the migrations in
 before first run.
 
 > The cron-triggered poller only runs on a deployed Worker. Locally, use each
-> watch's **check now** button to trigger a poll.
+> watch's **check now** button to trigger a poll. Local email sends are
+> logged by Miniflare rather than actually delivered — test real delivery
+> against a deployed Worker.
 
 ## Optional configuration
 
-Email alerts are delivered through Resend when these variables are set (in
-`.dev.vars` locally, or as Worker secrets via `wrangler secret put` in
-production). Without them, alerts still appear in the in-app feed:
+- `ALERT_FROM_EMAIL` — override the default `alerts@campsurfcali.com` sender
+  (in `.dev.vars` locally, or as a Worker secret via `wrangler secret put` in
+  production).
 
-- `RESEND_API_KEY` — your Resend API key
-- `ALERT_FROM_EMAIL` — verified sender, e.g. `Alerts <alerts@yourdomain.com>`
+Email sending requires `campsurfcali.com` to be onboarded to Cloudflare Email
+Sending (**Compute & AI → Email Service → Email Sending** in the dashboard, or
+`wrangler email sending enable campsurfcali.com`) so its SPF/DKIM records exist.
 
 ## A note on booking
 

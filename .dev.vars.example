@@ -1,3 +1,2 @@
 DATABASE_URL=postgresql://user:password@host/dbname?sslmode=require
-RESEND_API_KEY=
 ALERT_FROM_EMAIL=

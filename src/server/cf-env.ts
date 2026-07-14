@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 
 export interface CloudflareEnv {
   DATABASE_URL: string
-  RESEND_API_KEY?: string
+  EMAIL: SendEmail
   ALERT_FROM_EMAIL?: string
 }
 
