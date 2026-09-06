@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { watches, matches, type Watch, type AvailableUnit } from "../db/schema.js";
-import { getGrid, bookingUrl } from "./reserve-california.js";
+import { watches, matches, users, type Watch, type AvailableUnit } from "../db/schema.js";
+import { getGrid, bookingUrl, type GridResult } from "./reserve-california.js";
 import { matchUnits } from "./matcher.js";
 import { sendAlert } from "./notify.js";
 
@@ -12,17 +12,57 @@ export type PollSummary = {
   result: "available" | "unavailable" | "error";
 };
 
+type GridFetcher = (facilityId: number, startDate: string, endDate: string) => Promise<GridResult>;
+type CacheCheck = (facilityId: number, startDate: string, endDate: string) => boolean;
+
+function gridCacheKey(facilityId: number, startDate: string, endDate: string): string {
+  return `${facilityId}|${startDate}|${endDate}`;
+}
+
+/**
+ * Per-sweep cache so N watches (or N date ranges) pointed at the exact same
+ * facility+date-range only trigger one upstream request. The in-flight
+ * Promise itself is cached (not just the resolved value) so concurrent
+ * pollers racing on the same key still only issue one fetch — Map access is
+ * synchronous, so whichever caller reaches `fetch` first wins the slot.
+ */
+export function createGridCache(): { fetch: GridFetcher; wasCached: CacheCheck } {
+  const cache = new Map<string, Promise<GridResult>>();
+  return {
+    fetch(facilityId, startDate, endDate) {
+      const key = gridCacheKey(facilityId, startDate, endDate);
+      let entry = cache.get(key);
+      if (!entry) {
+        entry = getGrid(facilityId, startDate, endDate);
+        cache.set(key, entry);
+      }
+      return entry;
+    },
+    wasCached(facilityId, startDate, endDate) {
+      return cache.has(gridCacheKey(facilityId, startDate, endDate));
+    },
+  };
+}
+
 /**
  * Poll every one of a watch's date ranges and merge the results into a single
  * per-unit availability list, unioning the free dates when the same unit
  * shows up open in more than one range.
  */
-async function pollDateRanges(watch: Watch): Promise<AvailableUnit[]> {
+async function pollDateRanges(
+  watch: Watch,
+  fetchGrid: GridFetcher,
+  wasCached: CacheCheck,
+): Promise<AvailableUnit[]> {
   const byUnit = new Map<number, AvailableUnit>();
   for (const [i, range] of watch.dateRanges.entries()) {
-    // ~1 request/second to ReserveCalifornia, including across a watch's own ranges.
-    if (i > 0) await new Promise((r) => setTimeout(r, 1100));
-    const grid = await getGrid(watch.facilityId, range.startDate, range.endDate);
+    // ~1 request/second to ReserveCalifornia, but only when this range is
+    // actually going to hit the network — a range already served by the
+    // sweep's grid cache (see createGridCache) costs nothing to skip ahead of.
+    if (i > 0 && !wasCached(watch.facilityId, range.startDate, range.endDate)) {
+      await new Promise((r) => setTimeout(r, 1100));
+    }
+    const grid = await fetchGrid(watch.facilityId, range.startDate, range.endDate);
     for (const unit of matchUnits(grid.units, watch)) {
       const existing = byUnit.get(unit.unitId);
       if (existing) {
@@ -38,16 +78,29 @@ async function pollDateRanges(watch: Watch): Promise<AvailableUnit[]> {
 /**
  * Poll a single watch against ReserveCalifornia, persist the current
  * availability, and record + notify any newly-opened sites.
+ *
+ * `now` is passed in rather than captured fresh here so every watch in a
+ * sweep is stamped with the sweep's own start time, not a time that has
+ * drifted later by however long this watch waited in the queue — see
+ * `pollAllWatches`. Stamping a drifted time would make the *next* sweep's
+ * due-check (`isDue`) compare against a `now` that's already past
+ * `lastCheckedAt + checkFrequencyMinutes`, silently skipping this watch an
+ * extra tick.
  */
-export async function pollWatch(watch: Watch): Promise<PollSummary> {
+export async function pollWatch(
+  watch: Watch,
+  now: Date,
+  fetchGrid: GridFetcher,
+  wasCached: CacheCheck,
+  notifyImmediate: boolean,
+): Promise<PollSummary> {
   const url = bookingUrl(watch.placeId, watch.facilityId);
-  const now = new Date();
   // For a "daily" watch, a poll (successful or not) satisfies that day's check
-  // so the cron's 5-minute sweeps don't re-trigger it again until tomorrow.
+  // so the cron's sweeps don't re-trigger it again until tomorrow.
   const dailyBookkeeping =
     watch.scheduleMode === "daily" ? { lastDailyCheckDate: todayUTC(now) } : {};
   try {
-    const available = await pollDateRanges(watch);
+    const available = await pollDateRanges(watch, fetchGrid, wasCached);
 
     // Units that were not open on the previous poll are "newly open" and worth
     // an alert. Comparing against the stored snapshot prevents repeat spam.
@@ -55,6 +108,33 @@ export async function pollWatch(watch: Watch): Promise<PollSummary> {
       (watch.currentAvailability ?? []).map((u) => u.unitId),
     );
     const newlyOpen = available.filter((u) => !previousIds.has(u.unitId));
+
+    if (newlyOpen.length > 0) {
+      // Attempt notification *before* committing the availability snapshot
+      // below. If this throws (a transient DB or email hiccup), we fall
+      // through to the snapshot commit anyway rather than letting the
+      // failure prevent it — the snapshot commit is what marks these units
+      // "seen", and doing that before a successful alert would permanently
+      // erase the opening from future detection. Worst case on a genuine
+      // failure here is a duplicate alert next sweep, not a silently lost one.
+      try {
+        const outcome = await sendAlert({ watch, units: newlyOpen, bookingUrl: url, notifyImmediate });
+        await db.insert(matches).values(
+          newlyOpen.map((u) => ({
+            watchId: watch.id,
+            unitId: u.unitId,
+            unitName: u.unitName,
+            dates: u.dates,
+            bookingUrl: url,
+            autoBook: watch.autoBook,
+            notified: outcome.delivered,
+            notifyChannel: outcome.channel,
+          })),
+        );
+      } catch (err) {
+        console.error(`Alert/match insert failed for watch ${watch.id}:`, err);
+      }
+    }
 
     await db
       .update(watches)
@@ -66,22 +146,6 @@ export async function pollWatch(watch: Watch): Promise<PollSummary> {
         ...dailyBookkeeping,
       })
       .where(eq(watches.id, watch.id));
-
-    if (newlyOpen.length > 0) {
-      const channel = await sendAlert({ watch, units: newlyOpen, bookingUrl: url });
-      await db.insert(matches).values(
-        newlyOpen.map((u) => ({
-          watchId: watch.id,
-          unitId: u.unitId,
-          unitName: u.unitName,
-          dates: u.dates,
-          bookingUrl: url,
-          autoBook: watch.autoBook,
-          notified: true,
-          notifyChannel: channel,
-        })),
-      );
-    }
 
     return {
       watchId: watch.id,
@@ -126,16 +190,32 @@ function isDue(watch: Watch, now: Date): boolean {
   return dueAt <= now.getTime();
 }
 
-/** Poll every active, due watch, spacing requests out to stay a polite client. */
+const SWEEP_CONCURRENCY = 4;
+
+/** Poll every active, due watch with a small bounded-concurrency worker pool. */
 export async function pollAllWatches(): Promise<PollSummary[]> {
-  const active = await db.select().from(watches).where(eq(watches.active, true));
+  const rows = await db
+    .select({ watch: watches, notifyImmediate: users.notifyImmediate })
+    .from(watches)
+    .innerJoin(users, eq(watches.userId, users.id))
+    .where(eq(watches.active, true));
+
   const now = new Date();
-  const due = active.filter((w) => isDue(w, now));
-  const summaries: PollSummary[] = [];
-  for (const watch of due) {
-    summaries.push(await pollWatch(watch));
-    // ~1 request/second to ReserveCalifornia.
-    await new Promise((r) => setTimeout(r, 1100));
+  const due = rows.filter((r) => isDue(r.watch, now));
+  const { fetch: fetchGrid, wasCached } = createGridCache();
+
+  const summaries: PollSummary[] = new Array(due.length);
+  let next = 0;
+  async function worker() {
+    while (next < due.length) {
+      const i = next++;
+      const { watch, notifyImmediate } = due[i];
+      summaries[i] = await pollWatch(watch, now, fetchGrid, wasCached, notifyImmediate);
+    }
   }
+
+  await Promise.all(
+    Array.from({ length: Math.min(SWEEP_CONCURRENCY, due.length) }, worker),
+  );
   return summaries;
 }

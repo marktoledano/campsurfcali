@@ -103,9 +103,10 @@ export const watches = pgTable("watches", {
   autoBook: boolean("auto_book").notNull().default(false),
   // Paused watches are skipped by the poller.
   active: boolean().notNull().default(true),
-  // How often the poller should re-check this watch, in minutes (floor of 5,
-  // matching the Worker's own */5 cron cadence — see wrangler.toml). Only
-  // used when scheduleMode is "interval".
+  // How often the poller should re-check this watch, in minutes (floor of 5;
+  // the Worker's own cron sweeps more often than this — see wrangler.toml —
+  // so a watch is caught close to its own due time rather than waiting for
+  // the cron's cadence to also line up). Only used when scheduleMode is "interval".
   checkFrequencyMinutes: integer("check_frequency_minutes").notNull().default(5),
   // "interval" checks every checkFrequencyMinutes since the last check;
   // "daily" checks once per day at dailyCheckTime instead.
@@ -147,6 +148,18 @@ export const matches = pgTable("matches", {
   notified: boolean().notNull().default(false),
   notifyChannel: text("notify_channel"),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+/**
+ * Singleton lease row preventing two scheduled sweeps from running
+ * concurrently if one runs long. `lockedAt` is set atomically at sweep
+ * start and cleared when the sweep finishes; a stale lock (older than the
+ * staleness window in lib/poll.ts) is treated as free so a genuinely-hung
+ * sweep can't deadlock the poller forever.
+ */
+export const sweepLease = pgTable("sweep_lease", {
+  id: integer().primaryKey().default(1),
+  lockedAt: timestamp("locked_at"),
 });
 
 export type Watch = typeof watches.$inferSelect;

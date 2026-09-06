@@ -35,7 +35,11 @@ async function rdrFetch(path: string, init: RequestInit): Promise<Response> {
   let lastError: unknown;
   for (const host of HOSTS) {
     try {
-      const res = await fetch(`${host}${path}`, init);
+      // A hung connection must not stall the whole poll sweep behind it —
+      // AbortSignal.timeout rejects with a TimeoutError, which the catch
+      // below treats the same as any other network failure and falls
+      // through to the next host.
+      const res = await fetch(`${host}${path}`, { ...init, signal: AbortSignal.timeout(8000) });
       if (res.ok) return res;
       lastError = new Error(`RDR ${path} responded ${res.status}`);
     } catch (err) {

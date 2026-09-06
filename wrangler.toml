@@ -7,7 +7,7 @@ compatibility_flags = ["nodejs_compat"]
 directory = "dist/client"
 
 [triggers]
-crons = ["*/5 * * * *"]
+crons = ["*/2 * * * *"]
 
 [[send_email]]
 name = "EMAIL"

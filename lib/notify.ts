@@ -1,6 +1,4 @@
-import { eq } from "drizzle-orm";
-import { db } from "../db/index.js";
-import { users, type AvailableUnit, type Watch } from "../db/schema.js";
+import type { AvailableUnit, Watch } from "../db/schema.js";
 import { sendEmail } from "./email-transport.js";
 
 /**
@@ -26,23 +24,32 @@ export type EmailPayload = {
   watch: Watch;
   units: AvailableUnit[];
   bookingUrl: string;
+  /** The owning user's immediate-alert preference, prefetched by the caller
+   * (a per-alert DB lookup here would be an avoidable extra round trip). */
+  notifyImmediate: boolean;
+};
+
+export type AlertOutcome = {
+  channel: "email" | "in-app";
+  /** Whether the email actually sent, as opposed to just being attempted.
+   * `false` for both a failed send and a user with notifyImmediate off — see
+   * `channel` to distinguish those two cases. */
+  delivered: boolean;
 };
 
 /**
  * Attempt to send an immediate email alert for newly-opened sites. Returns
- * the channel used ("email" or "in-app") so callers can record how the user
- * was notified. Never throws — a failed send must not break the poll loop.
+ * the channel used ("email" or "in-app") and whether it actually delivered,
+ * so callers can record how the user was notified. Never throws — a failed
+ * send must not break the poll loop.
  */
 export async function sendAlert({
   watch,
   units,
   bookingUrl,
-}: EmailPayload): Promise<"email" | "in-app"> {
-  const [owner] = await db
-    .select({ notifyImmediate: users.notifyImmediate })
-    .from(users)
-    .where(eq(users.id, watch.userId));
-  if (!owner?.notifyImmediate) return "in-app";
+  notifyImmediate,
+}: EmailPayload): Promise<AlertOutcome> {
+  if (!notifyImmediate) return { channel: "in-app", delivered: false };
 
   const rows = units
     .slice(0, 15)
@@ -85,5 +92,5 @@ export async function sendAlert({
     html,
     text,
   });
-  return ok ? "email" : "in-app";
+  return ok ? { channel: "email", delivered: true } : { channel: "in-app", delivered: false };
 }

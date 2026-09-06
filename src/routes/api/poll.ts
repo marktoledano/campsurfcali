@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { eq } from "drizzle-orm";
 import { db } from "../../../db/index.js";
 import { watches } from "../../../db/schema.js";
-import { pollWatch } from "../../../lib/poll.js";
+import { createGridCache, pollWatch } from "../../../lib/poll.js";
 import { getSessionUser } from "../../../lib/auth.js";
 
 /**
@@ -31,7 +31,8 @@ export const Route = createFileRoute("/api/poll")({
         if (watch.userId !== user.id)
           return Response.json({ error: "forbidden" }, { status: 403 });
 
-        const summary = await pollWatch(watch);
+        const { fetch: fetchGrid, wasCached } = createGridCache();
+        const summary = await pollWatch(watch, new Date(), fetchGrid, wasCached, user.notifyImmediate);
         const [refreshed] = await db
           .select()
           .from(watches)
