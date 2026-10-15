@@ -11,6 +11,8 @@ export type DateRange = {
   endDate: string
 }
 
+export type DateMode = 'fixed' | 'recurring'
+
 export type Watch = {
   id: number
   email: string
@@ -20,6 +22,9 @@ export type Watch = {
   facilityId: number
   parkUrl: string | null
   dateRanges: DateRange[]
+  dateMode: DateMode
+  recurringStartDay: number | null
+  recurringNights: number | null
   minNights: number
   siteFilter: string | null
   adaOnly: boolean
@@ -80,7 +85,10 @@ export type NewWatchInput = {
   placeId: number
   facilityId: number
   parkUrl?: string | null
-  dateRanges: DateRange[]
+  dateMode?: DateMode
+  dateRanges?: DateRange[]
+  recurringStartDay?: number
+  recurringNights?: number
   minNights: number
   siteFilter: string | null
   adaOnly: boolean
@@ -130,7 +138,10 @@ export const api = {
       adaOnly?: boolean
       siteFilter?: string | null
       minNights?: number
+      dateMode?: DateMode
       dateRanges?: DateRange[]
+      recurringStartDay?: number
+      recurringNights?: number
       scheduleMode?: 'interval' | 'daily'
       checkFrequencyMinutes?: number
       dailyCheckTime?: string
@@ -264,6 +275,17 @@ export function nightsBetween(start: string, end: string): number {
   const a = new Date(start + 'T00:00:00Z').getTime()
   const b = new Date(end + 'T00:00:00Z').getTime()
   return Math.max(1, Math.round((b - a) / 86_400_000))
+}
+
+/** Mirrors lib/recurrence.ts's constant of the same name — see there for why 8. */
+export const RECURRING_HORIZON_WEEKS = 8
+
+export const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/** Compact recurring-watch display, e.g. "Every Fri–Sun, rolling 8wk". */
+export function formatRecurrence(startDay: number, nights: number): string {
+  const endDay = (startDay + nights) % 7
+  return `Every ${DAY_NAMES[startDay]}–${DAY_NAMES[endDay]}, rolling ${RECURRING_HORIZON_WEEKS}wk`
 }
 
 export const MIN_CHECK_FREQUENCY_MINUTES = 5

@@ -25,13 +25,17 @@ import {
 } from 'lucide-react'
 import {
   api,
+  DAY_NAMES,
   formatDateRange,
+  formatRecurrence,
   formatSchedule,
   frequencyToMinutes,
   localTimeToUtcHHMM,
   minutesToFrequency,
   nightsBetween,
+  RECURRING_HORIZON_WEEKS,
   utcHHMMToLocalTime,
+  type DateMode,
   type DateRange,
   type FrequencyUnit,
   type Watch,
@@ -78,6 +82,9 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
   const [saving, setSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
   const [ranges, setRanges] = useState<DateRange[]>(watch.dateRanges)
+  const [dateMode, setDateMode] = useState<DateMode>(watch.dateMode)
+  const [recurringStartDay, setRecurringStartDay] = useState(watch.recurringStartDay ?? 5)
+  const [recurringNights, setRecurringNights] = useState(watch.recurringNights ?? 2)
   const [minNights, setMinNights] = useState(watch.minNights)
   const [siteFilter, setSiteFilter] = useState(watch.siteFilter ?? '')
   const [adaOnly, setAdaOnly] = useState(watch.adaOnly)
@@ -129,6 +136,9 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
 
   function startEdit() {
     setRanges(watch.dateRanges)
+    setDateMode(watch.dateMode)
+    setRecurringStartDay(watch.recurringStartDay ?? 5)
+    setRecurringNights(watch.recurringNights ?? 2)
     setMinNights(watch.minNights)
     setSiteFilter(watch.siteFilter ?? '')
     setAdaOnly(watch.adaOnly)
@@ -162,10 +172,12 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
   }
 
   async function saveEdit() {
-    const badRange = ranges.find((r) => r.endDate <= r.startDate)
-    if (badRange) {
-      setEditError('Check-out must be after check-in for every date range.')
-      return
+    if (dateMode === 'fixed') {
+      const badRange = ranges.find((r) => r.endDate <= r.startDate)
+      if (badRange) {
+        setEditError('Check-out must be after check-in for every date range.')
+        return
+      }
     }
     setEditError(null)
     setSaving(true)
@@ -173,8 +185,10 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
       const maxWindow = Math.max(...ranges.map((r) => nightsBetween(r.startDate, r.endDate)))
       onChange(
         await api.patchWatch(watch.id, {
-          dateRanges: ranges,
-          minNights: Math.min(minNights, maxWindow),
+          dateMode,
+          ...(dateMode === 'recurring'
+            ? { recurringStartDay, recurringNights, minNights: Math.min(minNights, recurringNights) }
+            : { dateRanges: ranges, minNights: Math.min(minNights, maxWindow) }),
           siteFilter: siteFilter.trim() || null,
           adaOnly,
           scheduleMode,
@@ -206,7 +220,10 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
         placeId: park.placeId,
         facilityId: facility.facilityId,
         parkUrl: clonePicker.parkUrl,
-        dateRanges: watch.dateRanges,
+        dateMode: watch.dateMode,
+        ...(watch.dateMode === 'recurring'
+          ? { recurringStartDay: watch.recurringStartDay!, recurringNights: watch.recurringNights! }
+          : { dateRanges: watch.dateRanges }),
         minNights: watch.minNights,
         siteFilter: watch.siteFilter,
         adaOnly: watch.adaOnly,
@@ -258,8 +275,14 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
           </p>
         </div>
         <div className="hidden shrink-0 text-xs text-pine-soft sm:block">
-          {formatDateRange(watch.dateRanges[0].startDate, watch.dateRanges[0].endDate)}
-          {watch.dateRanges.length > 1 && ` +${watch.dateRanges.length - 1}`}
+          {watch.dateMode === 'recurring' ? (
+            formatRecurrence(watch.recurringStartDay!, watch.recurringNights!)
+          ) : (
+            <>
+              {formatDateRange(watch.dateRanges[0].startDate, watch.dateRanges[0].endDate)}
+              {watch.dateRanges.length > 1 && ` +${watch.dateRanges.length - 1}`}
+            </>
+          )}
         </div>
         {available && (
           <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-ocean/10 px-2.5 py-1 text-[11px] font-bold text-ocean-deep">
@@ -337,6 +360,62 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
               </div>
             ) : editing ? (
               <div className="mt-4 space-y-3 rounded-2xl border border-dashed border-ocean/30 bg-ocean/5 p-4">
+                <div className="mb-2 flex rounded-lg border border-pine/15 bg-white p-0.5 text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setDateMode('fixed')}
+                    className={`flex-1 rounded-md px-2.5 py-1.5 transition ${
+                      dateMode === 'fixed' ? 'bg-ocean text-paper' : 'text-pine-soft hover:text-pine'
+                    }`}
+                  >
+                    Fixed dates
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDateMode('recurring')}
+                    className={`flex-1 rounded-md px-2.5 py-1.5 transition ${
+                      dateMode === 'recurring' ? 'bg-ocean text-paper' : 'text-pine-soft hover:text-pine'
+                    }`}
+                  >
+                    Recurring
+                  </button>
+                </div>
+
+                {dateMode === 'recurring' ? (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <label className="text-xs">
+                      <span className="mb-1 block font-semibold text-pine-soft">Starts every</span>
+                      <select
+                        value={recurringStartDay}
+                        onChange={(e) => setRecurringStartDay(Number(e.target.value))}
+                        className="w-full rounded-lg border border-pine/15 bg-white px-3 py-2 text-sm text-pine outline-none focus:border-ocean"
+                      >
+                        {DAY_NAMES.map((name, i) => (
+                          <option key={i} value={i}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="text-xs">
+                      <span className="mb-1 block font-semibold text-pine-soft">For this many nights</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={14}
+                        value={recurringNights}
+                        onChange={(e) =>
+                          setRecurringNights(Math.max(1, Math.min(14, Number(e.target.value))))
+                        }
+                        className="w-full rounded-lg border border-pine/15 bg-white px-3 py-2 text-sm text-pine outline-none focus:border-ocean"
+                      />
+                    </label>
+                    <p className="col-span-full text-xs leading-relaxed text-pine-soft">
+                      Rolls forward {RECURRING_HORIZON_WEEKS} weeks ahead of today, always — never
+                      goes stale.
+                    </p>
+                  </div>
+                ) : (
                 <div className="space-y-2">
                   {ranges.map((r, i) => (
                     <div key={i} className="flex items-end gap-2">
@@ -372,6 +451,7 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
                     <Plus className="h-3.5 w-3.5" /> Add another date range
                   </button>
                 </div>
+                )}
 
                 <div className="grid gap-2 sm:grid-cols-2">
                   <label className="text-xs">
@@ -379,6 +459,7 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
                     <input
                       type="number"
                       min={1}
+                      max={dateMode === 'recurring' ? recurringNights : undefined}
                       value={minNights}
                       onChange={(e) => setMinNights(Math.max(1, Number(e.target.value)))}
                       className="w-full rounded-lg border border-pine/15 bg-white px-3 py-2 text-sm text-pine outline-none focus:border-ocean"
@@ -486,12 +567,16 @@ export function WatchCard({ watch, onChange, onRemove, onCloned }: Props) {
               <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-pine-soft">
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <Tent className="h-4 w-4 shrink-0 text-ocean" />
-                  {watch.dateRanges.map((r, i) => (
-                    <span key={i} className="flex items-center gap-2">
-                      {i > 0 && <span className="text-pine/30">+</span>}
-                      {formatDateRange(r.startDate, r.endDate)}
-                    </span>
-                  ))}
+                  {watch.dateMode === 'recurring' ? (
+                    formatRecurrence(watch.recurringStartDay!, watch.recurringNights!)
+                  ) : (
+                    watch.dateRanges.map((r, i) => (
+                      <span key={i} className="flex items-center gap-2">
+                        {i > 0 && <span className="text-pine/30">+</span>}
+                        {formatDateRange(r.startDate, r.endDate)}
+                      </span>
+                    ))
+                  )}
                 </span>
                 <span className="text-pine/30">•</span>
                 <span>

@@ -3,6 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "../../../db/index.js";
 import { watches, type NewWatch, type DateRange } from "../../../db/schema.js";
 import { getSessionUser } from "../../../lib/auth.js";
+import { expandRecurringRanges, parseRecurrence } from "../../../lib/recurrence.js";
 
 const MIN_CHECK_FREQUENCY_MINUTES = 5;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -38,7 +39,9 @@ export const Route = createFileRoute("/api/watches")({
           return Response.json({ error: "invalid JSON" }, { status: 400 });
         }
 
-        const errors = validate(body);
+        const dateMode = body.dateMode === "recurring" ? "recurring" : "fixed";
+
+        const errors = validate(body, dateMode);
         if (errors.length) {
           return Response.json({ error: errors.join("; ") }, { status: 400 });
         }
@@ -46,6 +49,28 @@ export const Route = createFileRoute("/api/watches")({
         const schedule = parseSchedule(body);
         if ("error" in schedule) {
           return Response.json({ error: schedule.error }, { status: 400 });
+        }
+
+        let dateFields: Pick<NewWatch, "dateRanges" | "recurringStartDay" | "recurringNights">;
+        if (dateMode === "recurring") {
+          const recurrence = parseRecurrence(body);
+          if ("error" in recurrence) {
+            return Response.json({ error: recurrence.error }, { status: 400 });
+          }
+          dateFields = {
+            dateRanges: expandRecurringRanges(recurrence.recurringStartDay, recurrence.recurringNights, new Date()),
+            recurringStartDay: recurrence.recurringStartDay,
+            recurringNights: recurrence.recurringNights,
+          };
+        } else {
+          dateFields = {
+            dateRanges: (body.dateRanges as any[]).map((r) => ({
+              startDate: String(r.startDate),
+              endDate: String(r.endDate),
+            })),
+            recurringStartDay: null,
+            recurringNights: null,
+          };
         }
 
         const values: NewWatch = {
@@ -56,10 +81,8 @@ export const Route = createFileRoute("/api/watches")({
           placeId: Number(body.placeId),
           facilityId: Number(body.facilityId),
           parkUrl: body.parkUrl ? String(body.parkUrl) : null,
-          dateRanges: (body.dateRanges as any[]).map((r) => ({
-            startDate: String(r.startDate),
-            endDate: String(r.endDate),
-          })),
+          dateMode,
+          ...dateFields,
           minNights: Math.max(1, Number(body.minNights) || 1),
           siteFilter: body.siteFilter ? String(body.siteFilter).trim() : null,
           adaOnly: Boolean(body.adaOnly),
@@ -126,12 +149,16 @@ function parseSchedule(
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-function validate(body: any): string[] {
+function validate(body: any, dateMode: "fixed" | "recurring"): string[] {
   const errors: string[] = [];
   if (!body?.facilityId || Number.isNaN(Number(body.facilityId)))
     errors.push("facilityId is required");
   if (!body?.placeId || Number.isNaN(Number(body.placeId)))
     errors.push("placeId is required");
+
+  // Recurring watches derive dateRanges server-side (see parseRecurrence
+  // above) instead of trusting a client-supplied list.
+  if (dateMode === "recurring") return errors;
 
   if (!Array.isArray(body?.dateRanges) || body.dateRanges.length === 0) {
     errors.push("at least one date range is required");

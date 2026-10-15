@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../../../db/index.js";
 import { watches, type DateRange } from "../../../db/schema.js";
 import { getSessionUser } from "../../../lib/auth.js";
+import { expandRecurringRanges, parseRecurrence } from "../../../lib/recurrence.js";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -85,7 +86,31 @@ export const Route = createFileRoute("/api/watches/$id")({
           patch.minNights = Math.floor(n);
         }
 
-        if (typeof body.dateRanges !== "undefined") {
+        if (typeof body.dateMode !== "undefined") {
+          if (body.dateMode === "recurring") {
+            const recurrence = parseRecurrence(body);
+            if ("error" in recurrence)
+              return Response.json({ error: recurrence.error }, { status: 400 });
+            patch.dateMode = "recurring";
+            patch.recurringStartDay = recurrence.recurringStartDay;
+            patch.recurringNights = recurrence.recurringNights;
+            patch.dateRanges = expandRecurringRanges(
+              recurrence.recurringStartDay,
+              recurrence.recurringNights,
+              new Date(),
+            );
+          } else if (body.dateMode === "fixed") {
+            patch.dateMode = "fixed";
+            patch.recurringStartDay = null;
+            patch.recurringNights = null;
+          } else {
+            return Response.json({ error: "dateMode must be 'fixed' or 'recurring'" }, { status: 400 });
+          }
+        }
+
+        // A dateMode: "recurring" switch above already derived dateRanges
+        // server-side; a client-supplied list in the same request is ignored.
+        if (typeof body.dateRanges !== "undefined" && patch.dateMode !== "recurring") {
           if (!Array.isArray(body.dateRanges) || body.dateRanges.length === 0)
             return Response.json(
               { error: "at least one date range is required" },

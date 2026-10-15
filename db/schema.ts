@@ -92,7 +92,24 @@ export const watches = pgTable("watches", {
   // Desired stay windows. A watch can track several separate date ranges at
   // the same campground (e.g. two different weekends); the poller checks
   // each one independently and merges the results.
+  //
+  // For a "recurring" watch (see dateMode), this holds the concrete ranges
+  // last computed by lib/recurrence.ts's expandRecurringRanges — the poller
+  // (and create/update) overwrite it every time so the dashboard always
+  // shows the current rolling window, but recurringStartDay/recurringNights
+  // (not this column) are the source of truth for that watch's config.
   dateRanges: jsonb("date_ranges").$type<DateRange[]>().notNull(),
+  // "fixed": dateRanges is the user's own finite list, edited directly.
+  // "recurring": dateRanges is derived each poll from recurringStartDay +
+  // recurringNights, sliding forward with "now" so the watch never goes
+  // stale — see lib/recurrence.ts.
+  dateMode: text("date_mode").notNull().default("fixed"),
+  // Day of week (0=Sun..6=Sat, matching JS Date#getUTCDay()) each occurrence
+  // starts on. Only set when dateMode is "recurring".
+  recurringStartDay: integer("recurring_start_day"),
+  // Consecutive nights per occurrence (e.g. 2 for a Fri+Sat weekend). Only
+  // set when dateMode is "recurring".
+  recurringNights: integer("recurring_nights"),
   // Minimum number of consecutive free nights that counts as a match.
   minNights: integer("min_nights").notNull().default(1),
   // Optional case-insensitive substring filter on the campsite/unit name.

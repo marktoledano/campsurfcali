@@ -10,9 +10,12 @@ import {
 } from 'lucide-react'
 import {
   api,
+  DAY_NAMES,
   frequencyToMinutes,
   localTimeToUtcHHMM,
   nightsBetween,
+  RECURRING_HORIZON_WEEKS,
+  type DateMode,
   type DateRange,
   type FrequencyUnit,
   type NewWatchInput,
@@ -51,6 +54,10 @@ export function AddWatchForm({ onCreated }: Props) {
   const picker = useSitePicker(ranges[0].startDate)
   const { park, facility } = picker
 
+  const [dateMode, setDateMode] = useState<DateMode>('fixed')
+  const [recurringStartDay, setRecurringStartDay] = useState(5) // Friday
+  const [recurringNights, setRecurringNights] = useState(2) // Fri+Sat
+
   const [minNights, setMinNights] = useState(1)
   const [siteFilter, setSiteFilter] = useState('')
   const [adaOnly, setAdaOnly] = useState(false)
@@ -78,21 +85,31 @@ export function AddWatchForm({ onCreated }: Props) {
   async function submit() {
     if (!park || !facility) return
     setError(null)
-    const badRange = ranges.find((r) => r.endDate <= r.startDate)
-    if (badRange) {
-      setError('Check-out must be after check-in for every date range.')
-      return
+    if (dateMode === 'fixed') {
+      const badRange = ranges.find((r) => r.endDate <= r.startDate)
+      if (badRange) {
+        setError('Check-out must be after check-in for every date range.')
+        return
+      }
     }
     setSubmitting(true)
-    const maxWindow = Math.max(...ranges.map((r) => nightsBetween(r.startDate, r.endDate)))
     const input: NewWatchInput = {
       parkName: park.name,
       facilityName: facility.name,
       placeId: park.placeId,
       facilityId: facility.facilityId,
       parkUrl: picker.parkUrl,
-      dateRanges: ranges,
-      minNights: Math.min(minNights, maxWindow),
+      dateMode,
+      ...(dateMode === 'recurring'
+        ? {
+            recurringStartDay,
+            recurringNights,
+            minNights: Math.min(minNights, recurringNights),
+          }
+        : {
+            dateRanges: ranges,
+            minNights: Math.min(minNights, maxWindow),
+          }),
       siteFilter: siteFilter.trim() || null,
       adaOnly,
       autoBook,
@@ -105,6 +122,9 @@ export function AddWatchForm({ onCreated }: Props) {
       await api.createWatch(input)
       picker.reset()
       setRanges([defaultRange()])
+      setDateMode('fixed')
+      setRecurringStartDay(5)
+      setRecurringNights(2)
       setMinNights(1)
       setSiteFilter('')
       setAdaOnly(false)
@@ -146,6 +166,72 @@ export function AddWatchForm({ onCreated }: Props) {
         {/* Step 3 — dates + options */}
         {facility && (
           <div className="rise space-y-5">
+            <Field label="Dates" icon={<Calendar className="h-4 w-4 text-ocean" />}>
+              <div className="mb-2 flex rounded-xl border border-pine/15 bg-sand/60 p-0.5 text-sm font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setDateMode('fixed')}
+                  className={`flex-1 rounded-lg px-3 py-2 transition ${
+                    dateMode === 'fixed' ? 'bg-ocean text-paper' : 'text-pine-soft hover:text-pine'
+                  }`}
+                >
+                  Fixed dates
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDateMode('recurring')}
+                  className={`flex-1 rounded-lg px-3 py-2 transition ${
+                    dateMode === 'recurring' ? 'bg-ocean text-paper' : 'text-pine-soft hover:text-pine'
+                  }`}
+                >
+                  Recurring
+                </button>
+              </div>
+            </Field>
+
+            {dateMode === 'recurring' ? (
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRecurringStartDay(5)
+                    setRecurringNights(2)
+                  }}
+                  className="flex items-center gap-1.5 text-sm font-semibold text-ocean-deep hover:underline"
+                >
+                  <Zap className="h-3.5 w-3.5" /> Weekends (Fri + Sat)
+                </button>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Starts every">
+                    <select
+                      value={recurringStartDay}
+                      onChange={(e) => setRecurringStartDay(Number(e.target.value))}
+                      className="w-full rounded-xl border border-pine/15 bg-sand/60 px-3 py-2.5 text-pine outline-none focus:border-ocean focus:bg-white"
+                    >
+                      {DAY_NAMES.map((name, i) => (
+                        <option key={i} value={i}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="For this many nights">
+                    <input
+                      type="number"
+                      min={1}
+                      max={14}
+                      value={recurringNights}
+                      onChange={(e) => setRecurringNights(Math.max(1, Math.min(14, Number(e.target.value))))}
+                      className="w-full rounded-xl border border-pine/15 bg-sand/60 px-3 py-2.5 text-pine outline-none focus:border-ocean focus:bg-white"
+                    />
+                  </Field>
+                </div>
+                <p className="text-xs leading-relaxed text-pine-soft">
+                  Tracks the next {RECURRING_HORIZON_WEEKS} weeks of this window, always rolling
+                  forward — never goes stale, no manual updates needed.
+                </p>
+              </div>
+            ) : (
             <div className="space-y-3">
               {ranges.map((range, i) => (
                 <div key={i} className="flex items-end gap-2">
@@ -198,13 +284,18 @@ export function AddWatchForm({ onCreated }: Props) {
                 <Plus className="h-3.5 w-3.5" /> Add another date range
               </button>
             </div>
+            )}
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label={`Minimum consecutive nights (longest window is ${maxWindow})`}>
+              <Field
+                label={`Minimum consecutive nights (longest window is ${
+                  dateMode === 'recurring' ? recurringNights : maxWindow
+                })`}
+              >
                 <input
                   type="number"
                   min={1}
-                  max={maxWindow}
+                  max={dateMode === 'recurring' ? recurringNights : maxWindow}
                   value={minNights}
                   onChange={(e) => setMinNights(Math.max(1, Number(e.target.value)))}
                   className="w-full rounded-xl border border-pine/15 bg-sand/60 px-3 py-2.5 text-pine outline-none focus:border-ocean focus:bg-white"

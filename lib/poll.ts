@@ -1,9 +1,10 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { watches, matches, users, type Watch, type AvailableUnit } from "../db/schema.js";
+import { watches, matches, users, type Watch, type AvailableUnit, type DateRange } from "../db/schema.js";
 import { getGrid, bookingUrl, type GridResult } from "./reserve-california.js";
 import { matchUnits } from "./matcher.js";
 import { sendAlert } from "./notify.js";
+import { expandRecurringRanges } from "./recurrence.js";
 
 export type PollSummary = {
   watchId: number;
@@ -51,11 +52,12 @@ export function createGridCache(): { fetch: GridFetcher; wasCached: CacheCheck }
  */
 async function pollDateRanges(
   watch: Watch,
+  dateRanges: DateRange[],
   fetchGrid: GridFetcher,
   wasCached: CacheCheck,
 ): Promise<AvailableUnit[]> {
   const byUnit = new Map<number, AvailableUnit>();
-  for (const [i, range] of watch.dateRanges.entries()) {
+  for (const [i, range] of dateRanges.entries()) {
     // ~1 request/second to ReserveCalifornia, but only when this range is
     // actually going to hit the network — a range already served by the
     // sweep's grid cache (see createGridCache) costs nothing to skip ahead of.
@@ -99,15 +101,29 @@ export async function pollWatch(
   // so the cron's sweeps don't re-trigger it again until tomorrow.
   const dailyBookkeeping =
     watch.scheduleMode === "daily" ? { lastDailyCheckDate: todayUTC(now) } : {};
+  // A recurring watch's dateRanges are re-derived from "now" on every poll
+  // instead of being read as a stored, finite list — this is what keeps it
+  // from ever going stale. See lib/recurrence.ts.
+  const effectiveRanges =
+    watch.dateMode === "recurring"
+      ? expandRecurringRanges(watch.recurringStartDay!, watch.recurringNights!, now)
+      : watch.dateRanges;
+  const recurringBookkeeping = watch.dateMode === "recurring" ? { dateRanges: effectiveRanges } : {};
   try {
-    const available = await pollDateRanges(watch, fetchGrid, wasCached);
+    const available = await pollDateRanges(watch, effectiveRanges, fetchGrid, wasCached);
 
-    // Units that were not open on the previous poll are "newly open" and worth
-    // an alert. Comparing against the stored snapshot prevents repeat spam.
-    const previousIds = new Set(
-      (watch.currentAvailability ?? []).map((u) => u.unitId),
+    // A specific (unit, date) pair not open on the previous poll is "newly
+    // open" and worth an alert. Keying on the date as well as the unit (not
+    // just the unit) matters most for recurring watches, where the same
+    // physical site number recurs week after week — comparing by unitId
+    // alone would permanently suppress alerts for every week after the
+    // first one a site was ever seen open.
+    const previousKeys = new Set(
+      (watch.currentAvailability ?? []).flatMap((u) => u.dates.map((d) => `${u.unitId}:${d}`)),
     );
-    const newlyOpen = available.filter((u) => !previousIds.has(u.unitId));
+    const newlyOpen = available
+      .map((u) => ({ ...u, dates: u.dates.filter((d) => !previousKeys.has(`${u.unitId}:${d}`)) }))
+      .filter((u) => u.dates.length > 0);
 
     if (newlyOpen.length > 0) {
       // Attempt notification *before* committing the availability snapshot
@@ -144,6 +160,7 @@ export async function pollWatch(
         lastCheckedAt: now,
         lastResult: available.length > 0 ? "available" : "unavailable",
         ...dailyBookkeeping,
+        ...recurringBookkeeping,
       })
       .where(eq(watches.id, watch.id));
 
