@@ -9,15 +9,29 @@ import { sendEmail } from "./email-transport.js";
  * recorded and shown in the app.
  */
 
+function formatDate(d: string): string {
+  return new Date(d + "T00:00:00Z").toLocaleDateString("en-US", {
+    timeZone: "UTC",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 function formatDates(dates: string[]): string {
-  return dates
-    .map((d) => new Date(d + "T00:00:00Z").toLocaleDateString("en-US", {
-      timeZone: "UTC",
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-    }))
-    .join(", ");
+  return dates.map(formatDate).join(", ");
+}
+
+/**
+ * ReserveCalifornia's own site has no URL parameter that pre-selects a
+ * date — the booking link always lands on the facility's default calendar
+ * view, so this is the one thing we can do to help: call out exactly which
+ * date(s) to navigate to once there.
+ */
+function dateRangeSummary(units: AvailableUnit[]): string {
+  const dates = [...new Set(units.flatMap((u) => u.dates))].sort();
+  if (dates.length === 0) return "";
+  return dates.length === 1 ? formatDate(dates[0]) : `${formatDate(dates[0])} – ${formatDate(dates[dates.length - 1])}`;
 }
 
 export type EmailPayload = {
@@ -71,7 +85,15 @@ export async function sendAlert({
         ${windows} window${watch.dateRanges.length > 1 ? "s" : ""}.
       </p>
       <ul>${rows}</ul>
-      <p style="margin:20px 0">
+      <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:10px;padding:14px 16px;margin:20px 0;text-align:center">
+        <p style="margin:0 0 2px;font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#0f766e">
+          Navigate to this date on ReserveCalifornia
+        </p>
+        <p style="margin:0;font-size:18px;font-weight:700;color:#134e4a">
+          ${dateRangeSummary(units)}
+        </p>
+      </div>
+      <p style="margin:0 0 20px">
         <a href="${bookingUrl}"
            style="background:#0d9488;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600">
           Book on ReserveCalifornia →
@@ -84,7 +106,7 @@ export async function sendAlert({
 
   const text = `${watch.facilityName} at ${watch.parkName} has availability for your ${windows} window${
     watch.dateRanges.length > 1 ? "s" : ""
-  }:\n${units.map((u) => `- ${u.unitName} — ${formatDates(u.dates)}`).join("\n")}\n\nBook: ${bookingUrl}`;
+  }:\n${units.map((u) => `- ${u.unitName} — ${formatDates(u.dates)}`).join("\n")}\n\nNavigate to this date on ReserveCalifornia: ${dateRangeSummary(units)}\nBook: ${bookingUrl}`;
 
   const ok = await sendEmail({
     to: watch.email,
